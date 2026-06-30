@@ -105,15 +105,14 @@ button {
 
 .scanner {
   display: none;
-  position: relative;
   margin-top: 12px;
   border-radius: 16px;
   overflow: hidden;
   border: 1px solid #d1d5db;
   background: #000;
-  height: 85vh;
-  max-height: 760px;
-  min-height: 560px;
+  height: 82vh;
+  max-height: 740px;
+  min-height: 540px;
 }
 
 #readerVideo {
@@ -248,28 +247,10 @@ button {
 }
 
 
-.scanGuide {
-  position: absolute;
-  left: 5%;
-  top: 37%;
-  width: 90%;
-  height: 26%;
-  border: 3px solid rgba(22, 163, 74, 0.95);
-  border-radius: 14px;
-  box-shadow: 0 0 0 9999px rgba(0,0,0,0.18);
-  pointer-events: none;
-}
 
 @media (max-width: 420px) {
   .scanner {
     height: 88vh;
     min-height: 600px;
-  }
-
-  .scanGuide {
-    left: 4%;
-    top: 36%;
-    width: 92%;
-    height: 28%;
   }
 }
