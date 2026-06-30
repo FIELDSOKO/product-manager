@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>商品管理システム</title>
-  <script src="https://unpkg.com/html5-qrcode"></script>
+  <script src="https://unpkg.com/@zxing/library@latest"></script>
   <link rel="stylesheet" href="style.css">
 </head>
 
@@ -18,7 +18,7 @@
       <button class="primary wide" onclick="toggleScanner()">📷 JANスキャン</button>
 
       <div class="scanner" id="scannerBox">
-        <div id="reader"></div>
+        <video id="readerVideo" playsinline muted></video>
       </div>
 
       <div class="field" style="margin-top:14px;">

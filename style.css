@@ -106,13 +106,21 @@ button {
 .scanner {
   display: none;
   margin-top: 12px;
-  border-radius: 14px;
+  border-radius: 16px;
   overflow: hidden;
   border: 1px solid #d1d5db;
-  background: black;
+  background: #000;
+  height: 85vh;
+  max-height: 720px;
+  min-height: 460px;
 }
 
-#reader { width: 100%; }
+#readerVideo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #000;
+}
 
 .hidden { display: none !important; }
 
@@ -229,7 +237,11 @@ button {
 }
 
 @media (max-width: 420px) {
-  body { padding: 12px; }
+  body { padding: 10px; }
   .grid { grid-template-columns: 1fr; gap: 0; }
   .btn-row { grid-template-columns: 1fr; }
+  .scanner {
+    height: 86vh;
+    min-height: 560px;
+  }
 }

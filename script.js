@@ -1,8 +1,9 @@
 const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzN6ULmcDYUWLTmft67k_Wrra1WazV_aHroJPE63kQnFyLo9LW4_8Rb43qo9hxyTn9krw/exec";
 
 let selectedItem = null;
-let html5QrCode = null;
+let codeReader = null;
 let scannerRunning = false;
+let scannerLocked = false;
 
 window.addEventListener("load", function() {
   loadMasterUpdatedAt();
@@ -259,76 +260,72 @@ function clearAll() {
 }
 
 async function toggleScanner() {
-  showMessage("info", "カメラを起動しています...");
-
-  const box = document.getElementById("scannerBox");
-
   if (scannerRunning) {
     await stopScanner();
-    box.style.display = "none";
+    document.getElementById("scannerBox").style.display = "none";
     hideMessage();
     return;
   }
 
-  if (typeof Html5Qrcode === "undefined") {
-    showMessage("error", "バーコード読取ライブラリを読み込めませんでした。ページを再読み込みしてください。");
+  if (typeof ZXing === "undefined") {
+    showMessage("error", "JAN読取ライブラリを読み込めませんでした。ページを再読み込みしてください。");
     return;
   }
 
-  box.style.display = "block";
+  showMessage("info", "カメラを起動しています...");
+  document.getElementById("scannerBox").style.display = "block";
 
   try {
-    const cameras = await Html5Qrcode.getCameras();
+    const hints = new Map();
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+      ZXing.BarcodeFormat.EAN_13
+    ]);
+    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
 
-    if (!cameras || cameras.length === 0) {
+    codeReader = new ZXing.BrowserMultiFormatReader(hints, 100);
+
+    const devices = await codeReader.listVideoInputDevices();
+
+    if (!devices || devices.length === 0) {
       showMessage("error", "使用できるカメラが見つかりませんでした。ブラウザのカメラ許可を確認してください。");
-      box.style.display = "none";
       return;
     }
 
-    let cameraId = cameras[0].id;
+    let deviceId = devices[0].deviceId;
 
-    for (let i = 0; i < cameras.length; i++) {
-      const label = String(cameras[i].label || "").toLowerCase();
+    for (let i = 0; i < devices.length; i++) {
+      const label = String(devices[i].label || "").toLowerCase();
       if (
         label.includes("back") ||
         label.includes("rear") ||
         label.includes("environment") ||
-        label.includes("背面")
+        label.includes("背面") ||
+        label.includes("外側")
       ) {
-        cameraId = cameras[i].id;
+        deviceId = devices[i].deviceId;
         break;
       }
     }
 
-    if (!html5QrCode) {
-      html5QrCode = new Html5Qrcode("reader");
-    }
-
     scannerRunning = true;
+    scannerLocked = false;
 
-    await html5QrCode.start(
-      cameraId,
-      {
-        fps: 30,
-        qrbox: function(w, h) {
-          return {
-            width: Math.floor(w * 0.95),
-            height: Math.floor(h * 0.25)
-          };
+    await codeReader.decodeFromVideoDevice(
+      deviceId,
+      "readerVideo",
+      function(result, err) {
+        if (result && !scannerLocked) {
+          scannerLocked = true;
+          onScanSuccess(result.getText());
         }
-      },
-      function(decodedText) {
-        onScanSuccess(decodedText);
-      },
-      function() {}
+      }
     );
 
-    showMessage("success", "カメラ起動中です。JANコードを映してください。");
+    showMessage("success", "JANコードを画面いっぱいに大きく映してください。");
 
   } catch (err) {
     scannerRunning = false;
-    box.style.display = "none";
+    document.getElementById("scannerBox").style.display = "none";
     showMessage(
       "error",
       "カメラを起動できませんでした。\n\n原因：" + (err && err.message ? err.message : String(err))
@@ -337,24 +334,43 @@ async function toggleScanner() {
 }
 
 async function stopScanner() {
-  if (html5QrCode && scannerRunning) {
-    try {
-      await html5QrCode.stop();
-    } catch (e) {}
-  }
+  try {
+    if (codeReader) {
+      codeReader.reset();
+    }
+  } catch (e) {}
+
   scannerRunning = false;
+  scannerLocked = false;
+}
+
+function isValidJan13(jan) {
+  if (!/^\d{13}$/.test(jan)) return false;
+
+  let sum = 0;
+
+  for (let i = 0; i < 12; i++) {
+    const n = Number(jan.charAt(i));
+    sum += (i % 2 === 0) ? n : n * 3;
+  }
+
+  const checkDigit = (10 - (sum % 10)) % 10;
+  return checkDigit === Number(jan.charAt(12));
 }
 
 async function onScanSuccess(decodedText) {
   const text = String(decodedText || "").trim();
   const jan = text.replace(/[^\d]/g, "");
 
-  if (jan && jan.length >= 8 && jan.length <= 14) {
-    document.getElementById("janInput").value = jan;
-    document.getElementById("textInput").value = "";
-  } else {
-    document.getElementById("textInput").value = text;
+  if (!isValidJan13(jan)) {
+    showMessage("error", "JAN13ではありません。もう一度読み取ってください。");
+    scannerLocked = false;
+    return;
   }
+
+  document.getElementById("janInput").value = jan;
+  document.getElementById("textInput").value = "";
+  showMessage("success", "JANを読み取りました：" + jan);
 
   await stopScanner();
   document.getElementById("scannerBox").style.display = "none";
