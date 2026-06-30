@@ -308,18 +308,24 @@ async function toggleScanner() {
       }
     }
 
-    if (!html5QrCode) {
-      html5QrCode = new Html5Qrcode("reader", {
-        formatsToSupport: [
-          Html5QrcodeSupportedFormats.EAN_13,
-          Html5QrcodeSupportedFormats.EAN_8,
-          Html5QrcodeSupportedFormats.UPC_A,
-          Html5QrcodeSupportedFormats.UPC_E,
-          Html5QrcodeSupportedFormats.CODE_128
-        ],
-        verbose: false
-      });
+    if (html5QrCode) {
+      try {
+        await html5QrCode.clear();
+      } catch (e) {}
+      html5QrCode = null;
     }
+
+    html5QrCode = new Html5Qrcode("reader", {
+      formatsToSupport: [
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E,
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.CODE_39
+      ],
+      verbose: false
+    });
 
     scannerRunning = true;
 
@@ -329,7 +335,7 @@ async function toggleScanner() {
         fps: 15,
         qrbox: function(w, h) {
           return {
-            width: Math.floor(w * 0.9),
+            width: Math.floor(w * 0.92),
             height: Math.floor(h * 0.32)
           };
         },
