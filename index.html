@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>商品管理システム</title>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app" id="app">
+    <div class="title">📦 商品管理システム</div>
+    <div class="sub">JAN検索・商品検索・ロケ変更</div>
+    <div class="updatedAt" id="updatedAt">商品マスタ更新日時：取得中...</div>
+
+    <div class="card">
+      <button class="primary wide" onclick="toggleScanner()">📷 JANスキャン</button>
+
+      <div class="scanner" id="scannerBox">
+        <div id="reader"></div>
+      </div>
+
+      <div class="field" style="margin-top:14px;">
+        <label>まとめて入力</label>
+        <textarea id="textInput" placeholder="例：4901234567890&#10;例：ABC 黒 23cm"></textarea>
+        <div class="small">JANだけでも検索できます。品番＋色＋サイズでも検索できます。</div>
+      </div>
+
+      <div class="grid">
+        <div class="field">
+          <label>JAN</label>
+          <input id="janInput" inputmode="numeric" placeholder="4901234567890">
+        </div>
+        <div class="field">
+          <label>品番</label>
+          <input id="hinbanInput" placeholder="ABC">
+        </div>
+        <div class="field">
+          <label>色</label>
+          <input id="colorInput" placeholder="黒">
+        </div>
+        <div class="field">
+          <label>サイズ</label>
+          <input id="sizeInput" placeholder="23cm">
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="primary" onclick="searchProduct()">🔍 検索</button>
+        <button class="secondary" onclick="clearAll()">🧹 クリア</button>
+      </div>
+
+      <div id="message" class="msg"></div>
+    </div>
+
+    <div class="card hidden" id="productCard">
+      <div class="info">
+        <div class="key">品番</div><div class="value" id="vHinban"></div>
+        <div class="key">品名</div><div class="value" id="vName"></div>
+        <div class="key">JAN</div><div class="value" id="vJan"></div>
+        <div class="key">色</div><div class="value" id="vColor"></div>
+        <div class="key">サイズ</div><div class="value" id="vSize"></div>
+      </div>
+
+      <div class="locBox">
+        <div class="locLabel">現在ロケ</div>
+        <div class="locValue" id="vLocation"></div>
+      </div>
+
+      <div class="field" style="margin-top:14px;">
+        <label>新ロケ</label>
+        <input id="newLocationInput" placeholder="B-3">
+      </div>
+
+      <button class="success wide" onclick="openConfirm()">📍 ロケ変更</button>
+    </div>
+
+    <div class="card hidden" id="multiCard">
+      <div style="font-weight:900;">検索結果</div>
+      <div class="small">複数見つかりました。変更したい商品を選んでください。</div>
+      <div id="resultList"></div>
+    </div>
+  </div>
+
+  <div class="modalBack" id="confirmModal">
+    <div class="modal">
+      <h2>ロケ変更しますか？</h2>
+
+      <div class="info">
+        <div class="key">品番</div><div class="value" id="mHinban"></div>
+        <div class="key">品名</div><div class="value" id="mName"></div>
+        <div class="key">色</div><div class="value" id="mColor"></div>
+        <div class="key">サイズ</div><div class="value" id="mSize"></div>
+      </div>
+
+      <div class="locBox">
+        <div class="locLabel">現在ロケ</div>
+        <div class="locValue" id="mOldLocation"></div>
+      </div>
+
+      <div class="arrow">↓</div>
+
+      <div class="locBox">
+        <div class="locLabel">変更後ロケ</div>
+        <div class="locValue" id="mNewLocation"></div>
+      </div>
+
+      <div class="modalBtns">
+        <button class="success" onclick="confirmUpdate()">はい</button>
+        <button class="secondary" onclick="closeConfirm()">いいえ</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modalBack" id="completeModal">
+    <div class="modal">
+      <h2>✅ ロケ変更しました</h2>
+
+      <div class="info">
+        <div class="key">品番</div><div class="value" id="cHinban"></div>
+        <div class="key">品名</div><div class="value" id="cName"></div>
+        <div class="key">色</div><div class="value" id="cColor"></div>
+        <div class="key">サイズ</div><div class="value" id="cSize"></div>
+      </div>
+
+      <div class="locBox">
+        <div class="locLabel">変更前</div>
+        <div class="locValue" id="cOldLocation"></div>
+      </div>
+
+      <div class="arrow">↓</div>
+
+      <div class="locBox">
+        <div class="locLabel">変更後</div>
+        <div class="locValue" id="cNewLocation"></div>
+      </div>
+
+      <button class="primary wide" onclick="finishComplete()">OK</button>
+    </div>
+  </div>
+  <script src="script.js"></script>
+</body>
+</html>
