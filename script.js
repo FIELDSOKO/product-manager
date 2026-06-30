@@ -276,52 +276,49 @@ async function toggleScanner() {
   document.getElementById("scannerBox").style.display = "block";
 
   try {
+    const video = document.getElementById("readerVideo");
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: {
+        facingMode: { ideal: "environment" },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+        focusMode: { ideal: "continuous" }
+      }
+    });
+
+    video.srcObject = stream;
+    await video.play();
+
+    const track = stream.getVideoTracks()[0];
+
+    if (track && track.applyConstraints) {
+      try {
+        await track.applyConstraints({
+          advanced: [
+            { focusMode: "continuous" },
+            { exposureMode: "continuous" },
+            { whiteBalanceMode: "continuous" }
+          ]
+        });
+      } catch (e) {}
+    }
+
     const hints = new Map();
     hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
       ZXing.BarcodeFormat.EAN_13
     ]);
     hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
 
-    codeReader = new ZXing.BrowserMultiFormatReader(hints, 100);
-
-    const devices = await codeReader.listVideoInputDevices();
-
-    if (!devices || devices.length === 0) {
-      showMessage("error", "使用できるカメラが見つかりませんでした。ブラウザのカメラ許可を確認してください。");
-      return;
-    }
-
-    let deviceId = devices[0].deviceId;
-
-    for (let i = 0; i < devices.length; i++) {
-      const label = String(devices[i].label || "").toLowerCase();
-      if (
-        label.includes("back") ||
-        label.includes("rear") ||
-        label.includes("environment") ||
-        label.includes("背面") ||
-        label.includes("外側")
-      ) {
-        deviceId = devices[i].deviceId;
-        break;
-      }
-    }
+    codeReader = new ZXing.BrowserMultiFormatReader(hints, 80);
 
     scannerRunning = true;
     scannerLocked = false;
 
-    await codeReader.decodeFromVideoDevice(
-      deviceId,
-      "readerVideo",
-      function(result, err) {
-        if (result && !scannerLocked) {
-          scannerLocked = true;
-          onScanSuccess(result.getText());
-        }
-      }
-    );
+    startCenterJanScanLoop_(video);
 
-    showMessage("success", "JANコードを画面いっぱいに大きく映してください。");
+    showMessage("success", "緑の枠内にJANコードを大きく横向きで映してください。");
 
   } catch (err) {
     scannerRunning = false;
@@ -333,8 +330,60 @@ async function toggleScanner() {
   }
 }
 
+function startCenterJanScanLoop_(video) {
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+
+  async function scanFrame() {
+    if (!scannerRunning || scannerLocked) return;
+
+    try {
+      if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
+        const vw = video.videoWidth;
+        const vh = video.videoHeight;
+
+        const cropW = Math.floor(vw * 0.90);
+        const cropH = Math.floor(vh * 0.30);
+        const cropX = Math.floor((vw - cropW) / 2);
+        const cropY = Math.floor((vh - cropH) / 2);
+
+        canvas.width = cropW;
+        canvas.height = cropH;
+
+        ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+
+        const result = codeReader.decodeFromCanvas(canvas);
+
+        if (result && result.getText) {
+          scannerLocked = true;
+          await onScanSuccess(result.getText());
+          return;
+        }
+      }
+    } catch (e) {
+      // 読み取れないフレームは無視して次のフレームへ
+    }
+
+    if (scannerRunning && !scannerLocked) {
+      setTimeout(scanFrame, 80);
+    }
+  }
+
+  scanFrame();
+}
+
 async function stopScanner() {
   try {
+    const video = document.getElementById("readerVideo");
+
+    if (video && video.srcObject) {
+      const tracks = video.srcObject.getTracks();
+      tracks.forEach(function(track) {
+        track.stop();
+      });
+      video.srcObject = null;
+    }
+
     if (codeReader) {
       codeReader.reset();
     }
@@ -363,7 +412,7 @@ async function onScanSuccess(decodedText) {
   const jan = text.replace(/[^\d]/g, "");
 
   if (!isValidJan13(jan)) {
-    showMessage("error", "JAN13ではありません。もう一度読み取ってください。");
+    showMessage("error", "JAN13ではありません。緑の枠内にもう一度映してください。");
     scannerLocked = false;
     return;
   }
