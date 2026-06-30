@@ -4,6 +4,9 @@ let selectedItem = null;
 let codeReader = null;
 let scannerRunning = false;
 let scannerLocked = false;
+let lastScanJan = "";
+let lastScanTime = 0;
+let sameScanCount = 0;
 
 window.addEventListener("load", function() {
   loadMasterUpdatedAt();
@@ -92,6 +95,7 @@ function getPayload() {
     text: document.getElementById("textInput").value.trim(),
     jan: document.getElementById("janInput").value.trim(),
     hinban: document.getElementById("hinbanInput").value.trim(),
+    name: document.getElementById("nameInput").value.trim(),
     color: document.getElementById("colorInput").value.trim(),
     size: document.getElementById("sizeInput").value.trim()
   };
@@ -249,12 +253,16 @@ function clearAll() {
   document.getElementById("textInput").value = "";
   document.getElementById("janInput").value = "";
   document.getElementById("hinbanInput").value = "";
+  document.getElementById("nameInput").value = "";
   document.getElementById("colorInput").value = "";
   document.getElementById("sizeInput").value = "";
   document.getElementById("newLocationInput").value = "";
   document.getElementById("productCard").classList.add("hidden");
   document.getElementById("multiCard").classList.add("hidden");
   document.getElementById("resultList").innerHTML = "";
+  lastScanJan = "";
+  lastScanTime = 0;
+  sameScanCount = 0;
   hideMessage();
   document.getElementById("textInput").focus();
 }
@@ -391,6 +399,9 @@ async function stopScanner() {
 
   scannerRunning = false;
   scannerLocked = false;
+  lastScanJan = "";
+  lastScanTime = 0;
+  sameScanCount = 0;
 }
 
 function isValidJan13(jan) {
@@ -417,9 +428,30 @@ async function onScanSuccess(decodedText) {
     return;
   }
 
+  const now = Date.now();
+
+  if (jan === lastScanJan && (now - lastScanTime) <= 1500) {
+    sameScanCount += 1;
+  } else {
+    lastScanJan = jan;
+    sameScanCount = 1;
+  }
+
+  lastScanTime = now;
+
+  if (sameScanCount < 2) {
+    showMessage("info", "JAN確認中：" + jan + "\n同じJANをもう一度読み取ったら確定します。");
+    scannerLocked = false;
+    return;
+  }
+
   document.getElementById("janInput").value = jan;
   document.getElementById("textInput").value = "";
-  showMessage("success", "JANを読み取りました：" + jan);
+  showMessage("success", "JANを確定しました：" + jan);
+
+  lastScanJan = "";
+  lastScanTime = 0;
+  sameScanCount = 0;
 
   await stopScanner();
   document.getElementById("scannerBox").style.display = "none";
