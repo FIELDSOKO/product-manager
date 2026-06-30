@@ -11,6 +11,7 @@ window.addEventListener("load", function() {
 function callGas(action, params) {
   return new Promise(function(resolve, reject) {
     const callbackName = "__gasCallback_" + Date.now() + "_" + Math.floor(Math.random() * 100000);
+
     const query = new URLSearchParams();
     query.set("action", action);
     query.set("callback", callbackName);
@@ -21,9 +22,9 @@ function callGas(action, params) {
       }
     });
 
-    const tag = document.createElement("script");
-    tag.src = GAS_API_URL + "?" + query.toString();
-    tag.async = true;
+    const script = document.createElement("script");
+    script.src = GAS_API_URL + "?" + query.toString();
+    script.async = true;
 
     const timer = setTimeout(function() {
       cleanup();
@@ -32,8 +33,12 @@ function callGas(action, params) {
 
     function cleanup() {
       clearTimeout(timer);
-      if (tag.parentNode) tag.parentNode.removeChild(tag);
-      try { delete window[callbackName]; } catch (e) { window[callbackName] = undefined; }
+      if (script.parentNode) script.parentNode.removeChild(script);
+      try {
+        delete window[callbackName];
+      } catch (e) {
+        window[callbackName] = undefined;
+      }
     }
 
     window[callbackName] = function(data) {
@@ -41,12 +46,12 @@ function callGas(action, params) {
       resolve(data);
     };
 
-    tag.onerror = function() {
+    script.onerror = function() {
       cleanup();
       reject(new Error("Apps Scriptとの通信に失敗しました。"));
     };
 
-    document.body.appendChild(tag);
+    document.body.appendChild(script);
   });
 }
 
@@ -172,6 +177,7 @@ function openConfirm() {
   }
 
   const newLoc = document.getElementById("newLocationInput").value.trim();
+
   if (!newLoc) {
     showMessage("error", "新ロケを入力してください。");
     return;
@@ -254,6 +260,7 @@ function clearAll() {
 
 async function toggleScanner() {
   showMessage("info", "カメラを起動しています...");
+
   const box = document.getElementById("scannerBox");
 
   if (scannerRunning) {
@@ -272,6 +279,7 @@ async function toggleScanner() {
 
   try {
     const cameras = await Html5Qrcode.getCameras();
+
     if (!cameras || cameras.length === 0) {
       showMessage("error", "使用できるカメラが見つかりませんでした。ブラウザのカメラ許可を確認してください。");
       box.style.display = "none";
@@ -279,9 +287,15 @@ async function toggleScanner() {
     }
 
     let cameraId = cameras[0].id;
+
     for (let i = 0; i < cameras.length; i++) {
       const label = String(cameras[i].label || "").toLowerCase();
-      if (label.includes("back") || label.includes("rear") || label.includes("environment") || label.includes("背面")) {
+      if (
+        label.includes("back") ||
+        label.includes("rear") ||
+        label.includes("environment") ||
+        label.includes("背面")
+      ) {
         cameraId = cameras[i].id;
         break;
       }
@@ -305,7 +319,7 @@ async function toggleScanner() {
       function(decodedText) {
         onScanSuccess(decodedText);
       },
-      function(errorMessage) {}
+      function() {}
     );
 
     showMessage("success", "カメラ起動中です。JANコードを映してください。");
@@ -313,7 +327,10 @@ async function toggleScanner() {
   } catch (err) {
     scannerRunning = false;
     box.style.display = "none";
-    showMessage("error", "カメラを起動できませんでした。\n\n原因：" + (err && err.message ? err.message : String(err)));
+    showMessage(
+      "error",
+      "カメラを起動できませんでした。\n\n原因：" + (err && err.message ? err.message : String(err))
+    );
   }
 }
 
@@ -339,6 +356,7 @@ async function onScanSuccess(decodedText) {
 
   await stopScanner();
   document.getElementById("scannerBox").style.display = "none";
+
   searchProduct();
 }
 
