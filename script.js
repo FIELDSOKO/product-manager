@@ -259,7 +259,7 @@ function clearAll() {
 }
 
 async function toggleScanner() {
-  showMessage("info", "カメラを起動しています...");
+  showMessage("info", "JANスキャンを起動しています...");
 
   const box = document.getElementById("scannerBox");
 
@@ -272,6 +272,11 @@ async function toggleScanner() {
 
   if (typeof Html5Qrcode === "undefined") {
     showMessage("error", "バーコード読取ライブラリを読み込めませんでした。ページを再読み込みしてください。");
+    return;
+  }
+
+  if (typeof Html5QrcodeSupportedFormats === "undefined") {
+    showMessage("error", "バーコード形式の指定機能を読み込めませんでした。ページを再読み込みしてください。");
     return;
   }
 
@@ -290,11 +295,13 @@ async function toggleScanner() {
 
     for (let i = 0; i < cameras.length; i++) {
       const label = String(cameras[i].label || "").toLowerCase();
+
       if (
         label.includes("back") ||
         label.includes("rear") ||
         label.includes("environment") ||
-        label.includes("背面")
+        label.includes("背面") ||
+        label.includes("外側")
       ) {
         cameraId = cameras[i].id;
         break;
@@ -302,7 +309,16 @@ async function toggleScanner() {
     }
 
     if (!html5QrCode) {
-      html5QrCode = new Html5Qrcode("reader");
+      html5QrCode = new Html5Qrcode("reader", {
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E,
+          Html5QrcodeSupportedFormats.CODE_128
+        ],
+        verbose: false
+      });
     }
 
     scannerRunning = true;
@@ -310,11 +326,15 @@ async function toggleScanner() {
     await html5QrCode.start(
       cameraId,
       {
-        fps: 10,
+        fps: 15,
         qrbox: function(w, h) {
-          const size = Math.floor(Math.min(w, h) * 0.75);
-          return { width: size, height: size };
-        }
+          return {
+            width: Math.floor(w * 0.9),
+            height: Math.floor(h * 0.32)
+          };
+        },
+        aspectRatio: 1.7777778,
+        disableFlip: false
       },
       function(decodedText) {
         onScanSuccess(decodedText);
@@ -322,7 +342,7 @@ async function toggleScanner() {
       function() {}
     );
 
-    showMessage("success", "カメラ起動中です。JANコードを映してください。");
+    showMessage("success", "JANコードを横向きに大きく映してください。");
 
   } catch (err) {
     scannerRunning = false;
@@ -350,8 +370,10 @@ async function onScanSuccess(decodedText) {
   if (jan && jan.length >= 8 && jan.length <= 14) {
     document.getElementById("janInput").value = jan;
     document.getElementById("textInput").value = "";
+    showMessage("success", "JANを読み取りました：" + jan);
   } else {
     document.getElementById("textInput").value = text;
+    showMessage("info", "コードを読み取りました：" + text);
   }
 
   await stopScanner();
