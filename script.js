@@ -618,7 +618,7 @@ async function onScanSuccess(decodedText) {
 
   const now = Date.now();
 
-  if (jan === lastScanJan && (now - lastScanTime) <= 800) {
+  if (jan === lastScanJan && (now - lastScanTime) <= 1200) {
     sameScanCount += 1;
   } else {
     lastScanJan = jan;
