@@ -358,20 +358,9 @@ async function toggleScanner() {
     video.setAttribute("muted", "true");
     video.muted = true;
     video.autoplay = true;
+    video.srcObject = null;
 
     await waitForScannerViewReady_();
-
-    currentStream = await navigator.mediaDevices.getUserMedia({
-      audio: false,
-      video: { facingMode: { ideal: "environment" } }
-    });
-
-    video.srcObject = currentStream;
-    await video.play();
-    await waitForVideoReady_(video);
-
-    currentVideoTrack = currentStream.getVideoTracks()[0] || null;
-    setupCameraCapabilities_();
 
     const hints = new Map();
     hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.EAN_13]);
@@ -386,7 +375,9 @@ async function toggleScanner() {
 
     setupScannerTouchEvents_();
 
-    codeReader.decodeFromVideoElement(video, function(result, err) {
+    const deviceId = await getPreferredVideoDeviceId_();
+
+    codeReader.decodeFromVideoDevice(deviceId || null, video, function(result, err) {
       if (result && !scannerLocked) {
         scannerLocked = true;
         onScanSuccess(result.getText());
@@ -399,10 +390,38 @@ async function toggleScanner() {
       });
     });
 
+    await waitForVideoReady_(video);
+
+    currentStream = video.srcObject || null;
+    currentVideoTrack = currentStream && currentStream.getVideoTracks ?
+      (currentStream.getVideoTracks()[0] || null) : null;
+    setupCameraCapabilities_();
+
   } catch (err) {
     await stopScanner();
     closeScannerView_();
     showMessage("error", "カメラを起動できませんでした。\n\n原因：" + (err && err.message ? err.message : String(err)));
+  }
+}
+
+async function getPreferredVideoDeviceId_() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return null;
+
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const videos = devices.filter(function(device) {
+      return device.kind === "videoinput";
+    });
+
+    if (!videos.length) return null;
+
+    const rear = videos.find(function(device) {
+      return /back|rear|environment|外|背面|後面/i.test(device.label || "");
+    });
+
+    return (rear || videos[videos.length - 1]).deviceId || null;
+  } catch (e) {
+    return null;
   }
 }
 
