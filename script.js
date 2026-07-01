@@ -352,6 +352,14 @@ async function toggleScanner() {
 
   try {
     const video = document.getElementById("readerVideo");
+    if (!video) throw new Error("カメラ表示用のvideo要素が見つかりません。");
+
+    video.setAttribute("playsinline", "true");
+    video.setAttribute("muted", "true");
+    video.muted = true;
+    video.autoplay = true;
+
+    await waitForScannerViewReady_();
 
     currentStream = await navigator.mediaDevices.getUserMedia({
       audio: false,
@@ -360,6 +368,7 @@ async function toggleScanner() {
 
     video.srcObject = currentStream;
     await video.play();
+    await waitForVideoReady_(video);
 
     currentVideoTrack = currentStream.getVideoTracks()[0] || null;
     setupCameraCapabilities_();
@@ -377,11 +386,17 @@ async function toggleScanner() {
 
     setupScannerTouchEvents_();
 
-    await codeReader.decodeFromVideoElement(video, function(result, err) {
+    codeReader.decodeFromVideoElement(video, function(result, err) {
       if (result && !scannerLocked) {
         scannerLocked = true;
         onScanSuccess(result.getText());
       }
+    }).catch(function(err) {
+      if (!scannerRunning) return;
+      stopScanner().then(function() {
+        closeScannerView_();
+        showMessage("error", "JAN読取の開始に失敗しました。\n\n原因：" + (err && err.message ? err.message : String(err)));
+      });
     });
 
   } catch (err) {
@@ -389,6 +404,73 @@ async function toggleScanner() {
     closeScannerView_();
     showMessage("error", "カメラを起動できませんでした。\n\n原因：" + (err && err.message ? err.message : String(err)));
   }
+}
+
+function sleep_(ms) {
+  return new Promise(function(resolve) {
+    setTimeout(resolve, ms);
+  });
+}
+
+function waitForScannerViewReady_() {
+  return new Promise(function(resolve) {
+    requestAnimationFrame(function() {
+      requestAnimationFrame(function() {
+        resolve();
+      });
+    });
+  });
+}
+
+function waitForVideoReady_(video) {
+  return new Promise(function(resolve, reject) {
+    const startedAt = Date.now();
+    const timeoutMs = 5000;
+
+    function isReady() {
+      return video &&
+        video.readyState >= 2 &&
+        video.videoWidth > 0 &&
+        video.videoHeight > 0 &&
+        !video.paused;
+    }
+
+    function finish() {
+      cleanup();
+      sleep_(120).then(resolve);
+    }
+
+    function failIfTimeout() {
+      if (Date.now() - startedAt >= timeoutMs) {
+        cleanup();
+        reject(new Error("カメラ映像の準備がタイムアウトしました。"));
+        return true;
+      }
+      return false;
+    }
+
+    function check() {
+      if (isReady()) {
+        finish();
+        return;
+      }
+      if (failIfTimeout()) return;
+      setTimeout(check, 50);
+    }
+
+    function cleanup() {
+      video.removeEventListener("loadedmetadata", check);
+      video.removeEventListener("loadeddata", check);
+      video.removeEventListener("canplay", check);
+      video.removeEventListener("playing", check);
+    }
+
+    video.addEventListener("loadedmetadata", check);
+    video.addEventListener("loadeddata", check);
+    video.addEventListener("canplay", check);
+    video.addEventListener("playing", check);
+    check();
+  });
 }
 
 function openScannerView_() {
@@ -618,7 +700,7 @@ async function onScanSuccess(decodedText) {
 
   const now = Date.now();
 
-  if (jan === lastScanJan && (now - lastScanTime) <= 1500) {
+  if (jan === lastScanJan && (now - lastScanTime) <= 800) {
     sameScanCount += 1;
   } else {
     lastScanJan = jan;
