@@ -8,6 +8,10 @@ let lastScanJan = "";
 let lastScanTime = 0;
 let sameScanCount = 0;
 
+let currentSearchPayload = null;
+let currentOffset = 0;
+const SEARCH_LIMIT = 20;
+
 window.addEventListener("load", function() {
   loadMasterUpdatedAt();
 });
@@ -104,25 +108,49 @@ function getPayload() {
 function searchProduct() {
   hideMessage();
   hideProduct();
+
+  currentSearchPayload = getPayload();
+  currentOffset = 0;
+
+  runSearchPage(false);
+}
+
+function runSearchPage(append) {
+  const payload = Object.assign({}, currentSearchPayload || getPayload(), {
+    offset: currentOffset,
+    limit: SEARCH_LIMIT
+  });
+
   setLoading(true);
 
-  callGas("search", getPayload())
+  callGas("search", payload)
     .then(function(res) {
       setLoading(false);
 
       if (!res || !res.ok) {
         showMessage("error", res && res.message ? res.message : "検索に失敗しました。");
-        if (res && res.items && res.items.length) showMultiResults(res.items);
+        if (res && res.items && res.items.length) showMultiResults(res.items, append, res);
         return;
       }
 
-      if (res.items.length === 1) {
-        selectItem(res.items[0]);
+      const items = res.items || [];
+      const total = Number(res.total || res.count || items.length || 0);
+      const shown = Number(res.nextOffset || (currentOffset + items.length));
+
+      if (!append && items.length === 1 && !res.hasMore && total === 1) {
+        selectItem(items[0]);
         showMessage("success", "商品を見つけました。");
-      } else {
-        showMessage("info", res.items.length + "件見つかりました。商品を選んでください。");
-        showMultiResults(res.items);
+        return;
       }
+
+      if (res.hasMore) {
+        showMessage("info", total + "件中 " + shown + "件を表示しています。");
+      } else {
+        showMessage("info", total + "件見つかりました。商品を選んでください。");
+      }
+
+      showMultiResults(items, append, res);
+      currentOffset = shown;
     })
     .catch(function(err) {
       setLoading(false);
@@ -130,12 +158,27 @@ function searchProduct() {
     });
 }
 
-function showMultiResults(items) {
+function loadMoreResults() {
+  if (!currentSearchPayload) {
+    showMessage("error", "先に検索してください。");
+    return;
+  }
+
+  runSearchPage(true);
+}
+
+function showMultiResults(items, append, res) {
   const card = document.getElementById("multiCard");
   const list = document.getElementById("resultList");
-  list.innerHTML = "";
 
-  items.forEach(function(item) {
+  if (!append) {
+    list.innerHTML = "";
+  }
+
+  const oldMore = document.getElementById("loadMoreBtnWrap");
+  if (oldMore) oldMore.remove();
+
+  (items || []).forEach(function(item) {
     const div = document.createElement("div");
     div.className = "resultItem";
     div.innerHTML =
@@ -152,6 +195,20 @@ function showMultiResults(items) {
 
     list.appendChild(div);
   });
+
+  if (res && res.hasMore) {
+    const wrap = document.createElement("div");
+    wrap.id = "loadMoreBtnWrap";
+    wrap.style.marginTop = "12px";
+
+    const btn = document.createElement("button");
+    btn.className = "primary wide";
+    btn.textContent = "さらに20件読み込む";
+    btn.onclick = loadMoreResults;
+
+    wrap.appendChild(btn);
+    list.appendChild(wrap);
+  }
 
   card.classList.remove("hidden");
 }
@@ -263,6 +320,8 @@ function clearAll() {
   lastScanJan = "";
   lastScanTime = 0;
   sameScanCount = 0;
+  currentSearchPayload = null;
+  currentOffset = 0;
   hideMessage();
   document.getElementById("textInput").focus();
 }
