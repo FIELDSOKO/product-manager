@@ -8,6 +8,14 @@ let lastScanJan = "";
 let lastScanTime = 0;
 let sameScanCount = 0;
 
+let currentStream = null;
+let currentVideoTrack = null;
+let currentZoom = 1;
+let minZoom = 1;
+let maxZoom = 1;
+let pinchStartDistance = 0;
+let pinchStartZoom = 1;
+
 let currentSearchPayload = null;
 let currentOffset = 0;
 const SEARCH_LIMIT = 20;
@@ -101,7 +109,8 @@ function getPayload() {
     hinban: document.getElementById("hinbanInput").value.trim(),
     name: document.getElementById("nameInput").value.trim(),
     color: document.getElementById("colorInput").value.trim(),
-    size: document.getElementById("sizeInput").value.trim()
+    size: document.getElementById("sizeInput").value.trim(),
+    location: document.getElementById("locationInput").value.trim()
   };
 }
 
@@ -313,6 +322,7 @@ function clearAll() {
   document.getElementById("nameInput").value = "";
   document.getElementById("colorInput").value = "";
   document.getElementById("sizeInput").value = "";
+  document.getElementById("locationInput").value = "";
   document.getElementById("newLocationInput").value = "";
   document.getElementById("productCard").classList.add("hidden");
   document.getElementById("multiCard").classList.add("hidden");
@@ -328,9 +338,7 @@ function clearAll() {
 
 async function toggleScanner() {
   if (scannerRunning) {
-    await stopScanner();
-    document.getElementById("scannerBox").style.display = "none";
-    hideMessage();
+    await closeScannerManual();
     return;
   }
 
@@ -339,40 +347,27 @@ async function toggleScanner() {
     return;
   }
 
-  showMessage("info", "カメラを起動しています...");
-  document.getElementById("scannerBox").style.display = "block";
+  hideMessage();
+  openScannerView_();
 
   try {
+    const video = document.getElementById("readerVideo");
+
+    currentStream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: { facingMode: { ideal: "environment" } }
+    });
+
+    video.srcObject = currentStream;
+    await video.play();
+
+    currentVideoTrack = currentStream.getVideoTracks()[0] || null;
+    setupCameraCapabilities_();
+
     const hints = new Map();
-    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
-      ZXing.BarcodeFormat.EAN_13
-    ]);
-    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.EAN_13]);
 
     codeReader = new ZXing.BrowserMultiFormatReader(hints, 100);
-
-    const devices = await codeReader.listVideoInputDevices();
-
-    if (!devices || devices.length === 0) {
-      showMessage("error", "使用できるカメラが見つかりませんでした。ブラウザのカメラ許可を確認してください。");
-      return;
-    }
-
-    let deviceId = devices[0].deviceId;
-
-    for (let i = 0; i < devices.length; i++) {
-      const label = String(devices[i].label || "").toLowerCase();
-      if (
-        label.includes("back") ||
-        label.includes("rear") ||
-        label.includes("environment") ||
-        label.includes("背面") ||
-        label.includes("外側")
-      ) {
-        deviceId = devices[i].deviceId;
-        break;
-      }
-    }
 
     scannerRunning = true;
     scannerLocked = false;
@@ -380,41 +375,222 @@ async function toggleScanner() {
     lastScanTime = 0;
     sameScanCount = 0;
 
-    await codeReader.decodeFromVideoDevice(
-      deviceId,
-      "readerVideo",
-      function(result, err) {
-        if (result && !scannerLocked) {
-          scannerLocked = true;
-          onScanSuccess(result.getText());
-        }
-      }
-    );
+    setupScannerTouchEvents_();
 
-    showMessage("success", "JANコードを画面に大きく横向きで映してください。");
+    await codeReader.decodeFromVideoElement(video, function(result, err) {
+      if (result && !scannerLocked) {
+        scannerLocked = true;
+        onScanSuccess(result.getText());
+      }
+    });
 
   } catch (err) {
-    scannerRunning = false;
-    document.getElementById("scannerBox").style.display = "none";
-    showMessage(
-      "error",
-      "カメラを起動できませんでした。\n\n原因：" + (err && err.message ? err.message : String(err))
-    );
+    await stopScanner();
+    closeScannerView_();
+    showMessage("error", "カメラを起動できませんでした。\n\n原因：" + (err && err.message ? err.message : String(err)));
   }
+}
+
+function openScannerView_() {
+  const box = document.getElementById("scannerBox");
+  document.body.classList.add("scanner-open");
+  if (box) {
+    box.classList.add("show");
+    box.setAttribute("aria-hidden", "false");
+  }
+}
+
+function closeScannerView_() {
+  const box = document.getElementById("scannerBox");
+  document.body.classList.remove("scanner-open");
+  if (box) {
+    box.classList.remove("show");
+    box.setAttribute("aria-hidden", "true");
+  }
+}
+
+async function closeScannerManual() {
+  await stopScanner();
+  closeScannerView_();
+  hideMessage();
+}
+
+function setupCameraCapabilities_() {
+  minZoom = 1;
+  maxZoom = 1;
+  currentZoom = 1;
+  updateZoomButtons_();
+
+  if (!currentVideoTrack || !currentVideoTrack.getCapabilities) return;
+
+  try {
+    const caps = currentVideoTrack.getCapabilities();
+
+    if (caps.zoom) {
+      minZoom = Number(caps.zoom.min || 1);
+      maxZoom = Number(caps.zoom.max || 1);
+      currentZoom = minZoom;
+    }
+
+    if (currentVideoTrack.applyConstraints) {
+      currentVideoTrack.applyConstraints({
+        advanced: [
+          { focusMode: "continuous" },
+          { exposureMode: "continuous" },
+          { whiteBalanceMode: "continuous" }
+        ]
+      }).catch(function() {});
+    }
+
+    updateZoomButtons_();
+  } catch (e) {}
+}
+
+function setZoomLevel(level) {
+  applyZoom_(Number(level || 1));
+}
+
+function applyZoom_(target) {
+  let z = Number(target || 1);
+
+  if (maxZoom > minZoom) {
+    z = Math.max(minZoom, Math.min(maxZoom, z));
+  } else {
+    z = 1;
+  }
+
+  currentZoom = z;
+  updateZoomButtons_();
+
+  if (!currentVideoTrack || !currentVideoTrack.applyConstraints || maxZoom <= minZoom) return;
+
+  currentVideoTrack.applyConstraints({
+    advanced: [{ zoom: z }]
+  }).catch(function() {});
+}
+
+function updateZoomButtons_() {
+  const buttons = [
+    { el: document.getElementById("zoom1Btn"), value: 1 },
+    { el: document.getElementById("zoom15Btn"), value: 1.5 },
+    { el: document.getElementById("zoom2Btn"), value: 2 },
+    { el: document.getElementById("zoom3Btn"), value: 3 }
+  ].filter(function(x) {
+    return !!x.el;
+  });
+
+  if (!buttons.length) return;
+
+  let closest = buttons[0];
+  buttons.forEach(function(btn) {
+    if (Math.abs(currentZoom - btn.value) < Math.abs(currentZoom - closest.value)) {
+      closest = btn;
+    }
+  });
+
+  buttons.forEach(function(btn) {
+    btn.el.classList.toggle("active", btn.el === closest.el);
+  });
+}
+
+function setupScannerTouchEvents_() {
+  const box = document.getElementById("scannerBox");
+  if (!box || box.dataset.touchReady === "1") return;
+
+  box.dataset.touchReady = "1";
+
+  box.addEventListener("click", function(e) {
+    if (!scannerRunning) return;
+    if (e.target && e.target.closest && e.target.closest("button")) return;
+    requestTapFocus_(e.clientX, e.clientY);
+  });
+
+  box.addEventListener("touchstart", function(e) {
+    if (!scannerRunning) return;
+    if (e.touches && e.touches.length === 2) {
+      pinchStartDistance = getTouchDistance_(e.touches[0], e.touches[1]);
+      pinchStartZoom = currentZoom;
+    }
+  }, { passive: true });
+
+  box.addEventListener("touchmove", function(e) {
+    if (!scannerRunning) return;
+    if (e.touches && e.touches.length === 2 && pinchStartDistance > 0) {
+      const d = getTouchDistance_(e.touches[0], e.touches[1]);
+      applyZoom_(pinchStartZoom * (d / pinchStartDistance));
+    }
+  }, { passive: true });
+
+  box.addEventListener("touchend", function() {
+    pinchStartDistance = 0;
+  }, { passive: true });
+}
+
+function getTouchDistance_(a, b) {
+  const dx = a.clientX - b.clientX;
+  const dy = a.clientY - b.clientY;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+function requestTapFocus_(clientX, clientY) {
+  const mark = document.getElementById("focusMark");
+  const box = document.getElementById("scannerBox");
+
+  if (mark && box) {
+    const rect = box.getBoundingClientRect();
+    mark.style.left = (clientX - rect.left) + "px";
+    mark.style.top = (clientY - rect.top) + "px";
+    mark.style.display = "block";
+    setTimeout(function() { mark.style.display = "none"; }, 650);
+  }
+
+  if (!currentVideoTrack || !currentVideoTrack.applyConstraints || !box) return;
+
+  try {
+    const rect = box.getBoundingClientRect();
+    const x = (clientX - rect.left) / rect.width;
+    const y = (clientY - rect.top) / rect.height;
+
+    currentVideoTrack.applyConstraints({
+      advanced: [
+        { focusMode: "single-shot" },
+        { pointsOfInterest: [{ x: x, y: y }] }
+      ]
+    }).catch(function() {
+      currentVideoTrack.applyConstraints({
+        advanced: [{ focusMode: "continuous" }]
+      }).catch(function() {});
+    });
+  } catch (e) {}
 }
 
 async function stopScanner() {
   try {
-    if (codeReader) {
-      codeReader.reset();
+    if (codeReader) codeReader.reset();
+
+    if (currentStream) {
+      currentStream.getTracks().forEach(function(track) { track.stop(); });
     }
+
+    const video = document.getElementById("readerVideo");
+    if (video) video.srcObject = null;
   } catch (e) {}
+
+  currentStream = null;
+  currentVideoTrack = null;
+  currentZoom = 1;
+  minZoom = 1;
+  maxZoom = 1;
+  pinchStartDistance = 0;
+  pinchStartZoom = 1;
 
   scannerRunning = false;
   scannerLocked = false;
   lastScanJan = "";
   lastScanTime = 0;
   sameScanCount = 0;
+
+  updateZoomButtons_();
 }
 
 function isValidJan13(jan) {
@@ -436,14 +612,13 @@ async function onScanSuccess(decodedText) {
   const jan = text.replace(/[^\d]/g, "");
 
   if (!isValidJan13(jan)) {
-    showMessage("error", "JAN13ではありません。もう一度映してください。");
     scannerLocked = false;
     return;
   }
 
   const now = Date.now();
 
-  if (jan === lastScanJan && (now - lastScanTime) <= 1500) {
+  if (jan === lastScanJan && (now - lastScanTime) <= 800) {
     sameScanCount += 1;
   } else {
     lastScanJan = jan;
@@ -453,21 +628,19 @@ async function onScanSuccess(decodedText) {
   lastScanTime = now;
 
   if (sameScanCount < 2) {
-    showMessage("info", "JAN確認中：" + jan + "\n同じJANをもう一度読み取ったら確定します。");
     scannerLocked = false;
     return;
   }
 
   document.getElementById("janInput").value = jan;
   document.getElementById("textInput").value = "";
-  showMessage("success", "JANを確定しました：" + jan);
 
   lastScanJan = "";
   lastScanTime = 0;
   sameScanCount = 0;
 
   await stopScanner();
-  document.getElementById("scannerBox").style.display = "none";
+  closeScannerView_();
 
   searchProduct();
 }

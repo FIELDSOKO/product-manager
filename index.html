@@ -24,14 +24,10 @@
     <div class="card">
       <button class="primary wide" onclick="toggleScanner()">📷 JANスキャン</button>
 
-      <div class="scanner" id="scannerBox">
-        <video id="readerVideo" playsinline muted></video>
-      </div>
-
       <div class="field" style="margin-top:14px;">
         <label>まとめて入力</label>
         <textarea id="textInput" placeholder="例：4901234567890&#10;例：ABC 黒 23cm"></textarea>
-        <div class="small">JANだけでも検索できます。品番＋色＋サイズでも検索できます。</div>
+        <div class="small">JANだけでも検索できます。品番・品名・色・サイズ・ロケでも検索できます。</div>
       </div>
 
       <div class="grid">
@@ -54,6 +50,10 @@
         <div class="field">
           <label>サイズ</label>
           <input id="sizeInput" placeholder="23cm">
+        </div>
+        <div class="field">
+          <label>ロケ</label>
+          <input id="locationInput" placeholder="B-1">
         </div>
       </div>
 
@@ -92,6 +92,20 @@
       <div class="small">複数見つかりました。変更したい商品を選んでください。</div>
       <div id="resultList"></div>
     </div>
+  </div>
+
+
+
+  <div class="scanner" id="scannerBox" aria-hidden="true">
+    <video id="readerVideo" playsinline muted></video>
+    <div class="scannerControls">
+      <button type="button" class="zoomBtn active" id="zoom1Btn" onclick="setZoomLevel(1)">1×</button>
+      <button type="button" class="zoomBtn" id="zoom15Btn" onclick="setZoomLevel(1.5)">1.5×</button>
+      <button type="button" class="zoomBtn" id="zoom2Btn" onclick="setZoomLevel(2)">2×</button>
+      <button type="button" class="zoomBtn" id="zoom3Btn" onclick="setZoomLevel(3)">3×</button>
+    </div>
+    <button type="button" class="scannerCloseBtn" onclick="closeScannerManual()">✕ 閉じる</button>
+    <div class="focusMark" id="focusMark"></div>
   </div>
 
   <div class="modalBack" id="confirmModal">
