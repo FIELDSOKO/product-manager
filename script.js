@@ -5,7 +5,6 @@ let codeReader = null;
 let scannerRunning = false;
 let scannerLocked = false;
 let lastScanJan = "";
-let lastScanTime = 0;
 let sameScanCount = 0;
 
 let currentStream = null;
@@ -328,7 +327,6 @@ function clearAll() {
   document.getElementById("multiCard").classList.add("hidden");
   document.getElementById("resultList").innerHTML = "";
   lastScanJan = "";
-  lastScanTime = 0;
   sameScanCount = 0;
   currentSearchPayload = null;
   currentOffset = 0;
@@ -365,13 +363,12 @@ async function toggleScanner() {
     const hints = new Map();
     hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.EAN_13]);
 
-    codeReader = new ZXing.BrowserMultiFormatReader(hints, 100);
+    codeReader = new ZXing.BrowserMultiFormatReader(hints, 50);
 
     scannerRunning = true;
     scannerLocked = false;
     lastScanJan = "";
-    lastScanTime = 0;
-    sameScanCount = 0;
+      sameScanCount = 0;
 
     setupScannerTouchEvents_();
 
@@ -678,7 +675,6 @@ async function stopScanner() {
   scannerRunning = false;
   scannerLocked = false;
   lastScanJan = "";
-  lastScanTime = 0;
   sameScanCount = 0;
 
   updateZoomButtons_();
@@ -707,16 +703,12 @@ async function onScanSuccess(decodedText) {
     return;
   }
 
-  const now = Date.now();
-
-  if (jan === lastScanJan && (now - lastScanTime) <= 800) {
+  if (jan === lastScanJan) {
     sameScanCount += 1;
   } else {
     lastScanJan = jan;
     sameScanCount = 1;
   }
-
-  lastScanTime = now;
 
   if (sameScanCount < 2) {
     scannerLocked = false;
@@ -727,7 +719,6 @@ async function onScanSuccess(decodedText) {
   document.getElementById("textInput").value = "";
 
   lastScanJan = "";
-  lastScanTime = 0;
   sameScanCount = 0;
 
   await stopScanner();
