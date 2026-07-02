@@ -1,4 +1,5 @@
 const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzN6ULmcDYUWLTmft67k_Wrra1WazV_aHroJPE63kQnFyLo9LW4_8Rb43qo9hxyTn9krw/exec";
+const APP_VERSION = "2026.07.02.01";
 
 let selectedItem = null;
 let codeReader = null;
@@ -24,8 +25,14 @@ let currentOffset = 0;
 const SEARCH_LIMIT = 20;
 
 window.addEventListener("load", function() {
+  setAppVersion();
   loadMasterUpdatedAt();
 });
+
+function setAppVersion() {
+  const el = document.getElementById("appVersion");
+  if (el) el.textContent = "Ver." + APP_VERSION;
+}
 
 function callGas(action, params) {
   return new Promise(function(resolve, reject) {
