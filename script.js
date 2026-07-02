@@ -1,5 +1,5 @@
 const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzN6ULmcDYUWLTmft67k_Wrra1WazV_aHroJPE63kQnFyLo9LW4_8Rb43qo9hxyTn9krw/exec";
-const APP_VERSION = "2026.07.02.05";
+const APP_VERSION = "2026.07.02.06";
 
 let selectedItem = null;
 let codeReader = null;
@@ -19,6 +19,9 @@ const TRY_HARDER_START_GRACE_MS = 2500;
 const SCAN_START_SUSPICIOUS_MS = 450;
 const TRY_HARDER_SETTLE_MS = 600;
 const SUSPICIOUS_CONFIRM_COUNT = 3;
+const GUIDE_ROI_X_MARGIN_RATIO = 0.12;
+const GUIDE_ROI_Y_MARGIN_RATIO = 0.34;
+const GUIDE_ROI_SOFT_MARGIN_RATIO = 0.08;
 
 let currentStream = null;
 let currentVideoTrack = null;
@@ -422,6 +425,7 @@ async function toggleScanner() {
     currentVideoTrack = currentStream && currentStream.getVideoTracks ?
       (currentStream.getVideoTracks()[0] || null) : null;
     setupCameraCapabilities_();
+    requestCenterFocus_();
 
   } catch (err) {
     await stopScanner();
@@ -826,6 +830,19 @@ function requestTapFocus_(clientX, clientY) {
   } catch (e) {}
 }
 
+function requestCenterFocus_() {
+  if (!currentVideoTrack || !currentVideoTrack.applyConstraints) return;
+
+  try {
+    currentVideoTrack.applyConstraints({
+      advanced: [
+        { focusMode: "continuous" },
+        { pointsOfInterest: [{ x: 0.5, y: 0.5 }] }
+      ]
+    }).catch(function() {});
+  } catch (e) {}
+}
+
 async function stopScanner() {
   try {
     if (codeReader) codeReader.reset();
@@ -945,6 +962,49 @@ function isResultPointExtreme_(pointInfo) {
   return pointInfo.diagonal > 0 && pointInfo.diagonal < 18;
 }
 
+
+function getGuideRoiInVideoCoords_() {
+  const video = document.getElementById("readerVideo");
+  if (!video || !video.videoWidth || !video.videoHeight) return null;
+
+  const videoWidth = Number(video.videoWidth || 0);
+  const videoHeight = Number(video.videoHeight || 0);
+  if (!videoWidth || !videoHeight) return null;
+
+  return {
+    left: videoWidth * GUIDE_ROI_X_MARGIN_RATIO,
+    right: videoWidth * (1 - GUIDE_ROI_X_MARGIN_RATIO),
+    top: videoHeight * GUIDE_ROI_Y_MARGIN_RATIO,
+    bottom: videoHeight * (1 - GUIDE_ROI_Y_MARGIN_RATIO),
+    softLeft: videoWidth * Math.max(0, GUIDE_ROI_X_MARGIN_RATIO - GUIDE_ROI_SOFT_MARGIN_RATIO),
+    softRight: videoWidth * Math.min(1, 1 - GUIDE_ROI_X_MARGIN_RATIO + GUIDE_ROI_SOFT_MARGIN_RATIO),
+    softTop: videoHeight * Math.max(0, GUIDE_ROI_Y_MARGIN_RATIO - GUIDE_ROI_SOFT_MARGIN_RATIO),
+    softBottom: videoHeight * Math.min(1, 1 - GUIDE_ROI_Y_MARGIN_RATIO + GUIDE_ROI_SOFT_MARGIN_RATIO)
+  };
+}
+
+function getPointGuidePriority_(pointInfo) {
+  // resultPointsが取れない場合は端末差で読めなくなるのを防ぐため、通常扱いにする。
+  if (!pointInfo) return "unknown";
+
+  const roi = getGuideRoiInVideoCoords_();
+  if (!roi) return "unknown";
+
+  const cx = Number(pointInfo.centerX);
+  const cy = Number(pointInfo.centerY);
+  if (!isFinite(cx) || !isFinite(cy)) return "unknown";
+
+  if (cx >= roi.left && cx <= roi.right && cy >= roi.top && cy <= roi.bottom) {
+    return "inside";
+  }
+
+  if (cx >= roi.softLeft && cx <= roi.softRight && cy >= roi.softTop && cy <= roi.softBottom) {
+    return "near";
+  }
+
+  return "outside";
+}
+
 function isScanStartSuspicious_() {
   const now = Date.now();
 
@@ -959,8 +1019,9 @@ function isScanStartSuspicious_() {
   return false;
 }
 
-function isSuspiciousScan_(jan, pointInfo, stablePoints) {
+function isSuspiciousScan_(jan, pointInfo, stablePoints, guidePriority) {
   if (isResultPointExtreme_(pointInfo)) return true;
+  if (guidePriority === "outside") return true;
   if (isScanStartSuspicious_()) return true;
 
   // 同じ読取中にJANが急に変わり、かつ位置も安定していない場合だけ怪しい扱いにする。
@@ -1014,6 +1075,7 @@ async function onScanSuccess(scanResult) {
   const jan = text.replace(/[^\d]/g, "");
   const pointInfo = getResultPointInfo_(scanResult);
   const stablePoints = isResultPointStable_(lastScanPointInfo, pointInfo);
+  const guidePriority = getPointGuidePriority_(pointInfo);
 
   if (!isValidJan13(jan)) {
     scannerLocked = false;
@@ -1022,7 +1084,7 @@ async function onScanSuccess(scanResult) {
 
   scanMissCount = 0;
 
-  const suspicious = isSuspiciousScan_(jan, pointInfo, stablePoints);
+  const suspicious = isSuspiciousScan_(jan, pointInfo, stablePoints, guidePriority);
 
   if (jan === lastScanJan) {
     sameScanCount += 1;

@@ -149,6 +149,53 @@ button {
   background: #000;
 }
 
+.scannerGuide {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(76vw, 360px);
+  height: min(28vw, 128px);
+  min-height: 82px;
+  transform: translate(-50%, -50%);
+  z-index: 4;
+  pointer-events: none;
+  opacity: 0.72;
+}
+
+.scannerGuide span {
+  position: absolute;
+  width: 34px;
+  height: 22px;
+  border-color: rgba(255,255,255,0.86);
+}
+
+.scannerGuide span:nth-child(1) {
+  left: 0;
+  top: 0;
+  border-left: 2px solid rgba(255,255,255,0.86);
+  border-top: 2px solid rgba(255,255,255,0.86);
+}
+
+.scannerGuide span:nth-child(2) {
+  right: 0;
+  top: 0;
+  border-right: 2px solid rgba(255,255,255,0.86);
+  border-top: 2px solid rgba(255,255,255,0.86);
+}
+
+.scannerGuide span:nth-child(3) {
+  left: 0;
+  bottom: 0;
+  border-left: 2px solid rgba(255,255,255,0.86);
+  border-bottom: 2px solid rgba(255,255,255,0.86);
+}
+
+.scannerGuide span:nth-child(4) {
+  right: 0;
+  bottom: 0;
+  border-right: 2px solid rgba(255,255,255,0.86);
+  border-bottom: 2px solid rgba(255,255,255,0.86);
+}
 
 .scannerControls {
   position: absolute;
