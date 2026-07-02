@@ -345,6 +345,41 @@ function setScannerPreparing_(preparing) {
   document.body.classList.toggle("scanner-preparing", !!preparing);
 }
 
+function revealScannerWhenCameraStarts_(video) {
+  if (!video) return;
+
+  let revealed = false;
+
+  function reveal() {
+    if (revealed || !scannerRunning || scannerLocked) return;
+    revealed = true;
+    cleanup();
+    setScannerPreparing_(false);
+  }
+
+  function check() {
+    if (video.srcObject || video.readyState >= 1 || (video.videoWidth > 0 && video.videoHeight > 0)) {
+      reveal();
+    }
+  }
+
+  function cleanup() {
+    video.removeEventListener("loadedmetadata", reveal);
+    video.removeEventListener("loadeddata", reveal);
+    video.removeEventListener("canplay", reveal);
+    video.removeEventListener("playing", reveal);
+  }
+
+  video.addEventListener("loadedmetadata", reveal);
+  video.addEventListener("loadeddata", reveal);
+  video.addEventListener("canplay", reveal);
+  video.addEventListener("playing", reveal);
+
+  check();
+  setTimeout(check, 120);
+  setTimeout(reveal, 450);
+}
+
 async function toggleScanner() {
   if (scannerRunning) {
     await closeScannerManual();
@@ -385,6 +420,7 @@ async function toggleScanner() {
 
     const deviceId = await getPreferredVideoDeviceId_();
     startDecodeFromVideoDevice_(deviceId || null, video, false, true);
+    revealScannerWhenCameraStarts_(video);
 
     try {
       await waitForVideoReady_(video);
@@ -441,6 +477,7 @@ async function retryScannerWithNullDeviceAfterVideoTimeout_(video, originalErr) 
 
   codeReader = createCodeReader_(false);
   startDecodeFromVideoDevice_(null, video, false, false);
+  revealScannerWhenCameraStarts_(video);
 
   try {
     await waitForVideoReady_(video);
