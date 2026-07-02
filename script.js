@@ -232,7 +232,7 @@ function selectItem(item) {
   document.getElementById("vLocation").textContent = item.location || "未設定";
   document.getElementById("productCard").classList.remove("hidden");
   document.getElementById("multiCard").classList.add("hidden");
-  document.getElementById("newLocationInput").focus();
+  // document.getElementById("newLocationInput").focus();
 }
 
 function hideProduct() {
