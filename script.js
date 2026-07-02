@@ -6,6 +6,10 @@ let scannerRunning = false;
 let scannerLocked = false;
 let lastScanJan = "";
 let sameScanCount = 0;
+let scanMissCount = 0;
+let tryHarderEnabled = false;
+let scannerVideoReady = false;
+const TRY_HARDER_MISS_LIMIT = 36;
 
 let currentStream = null;
 let currentVideoTrack = null;
@@ -328,6 +332,9 @@ function clearAll() {
   document.getElementById("resultList").innerHTML = "";
   lastScanJan = "";
   sameScanCount = 0;
+  scanMissCount = 0;
+  tryHarderEnabled = false;
+  scannerVideoReady = false;
   currentSearchPayload = null;
   currentOffset = 0;
   hideMessage();
@@ -360,34 +367,23 @@ async function toggleScanner() {
 
     await waitForScannerViewReady_();
 
-    const hints = new Map();
-    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.EAN_13]);
-
-    codeReader = new ZXing.BrowserMultiFormatReader(hints, 50);
+    codeReader = createCodeReader_(false);
 
     scannerRunning = true;
     scannerLocked = false;
     lastScanJan = "";
-      sameScanCount = 0;
+    sameScanCount = 0;
+    scanMissCount = 0;
+    tryHarderEnabled = false;
+    scannerVideoReady = false;
 
     setupScannerTouchEvents_();
 
     const deviceId = await getPreferredVideoDeviceId_();
-
-    codeReader.decodeFromVideoDevice(deviceId || null, video, function(result, err) {
-      if (result && !scannerLocked) {
-        scannerLocked = true;
-        onScanSuccess(result.getText());
-      }
-    }).catch(function(err) {
-      if (!scannerRunning) return;
-      stopScanner().then(function() {
-        closeScannerView_();
-        showMessage("error", "JAN読取の開始に失敗しました。\n\n原因：" + (err && err.message ? err.message : String(err)));
-      });
-    });
+    startDecodeFromVideoDevice_(deviceId || null, video, false, true);
 
     await waitForVideoReady_(video);
+    scannerVideoReady = true;
 
     currentStream = video.srcObject || null;
     currentVideoTrack = currentStream && currentStream.getVideoTracks ?
@@ -420,6 +416,72 @@ async function getPreferredVideoDeviceId_() {
   } catch (e) {
     return null;
   }
+}
+
+function createCodeReader_(tryHarder) {
+  const hints = new Map();
+  hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.EAN_13]);
+
+  if (tryHarder) {
+    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+  }
+
+  return new ZXing.BrowserMultiFormatReader(hints, 50);
+}
+
+function handleDecodeResult_(result, err, video) {
+  if (result && !scannerLocked) {
+    scannerLocked = true;
+    onScanSuccess(result.getText());
+    return;
+  }
+
+  if (!result && err && scannerVideoReady && scannerRunning && !scannerLocked && !tryHarderEnabled) {
+    scanMissCount += 1;
+
+    if (scanMissCount >= TRY_HARDER_MISS_LIMIT) {
+      switchToTryHarder_(video);
+    }
+  }
+}
+
+function startDecodeFromVideoDevice_(deviceId, video, tryHarder, allowNullRetry) {
+  if (!codeReader) codeReader = createCodeReader_(tryHarder);
+
+  codeReader.decodeFromVideoDevice(deviceId || null, video, function(result, err) {
+    handleDecodeResult_(result, err, video);
+  }).catch(function(err) {
+    if (!scannerRunning) return;
+
+    if (allowNullRetry && deviceId) {
+      try {
+        if (codeReader) codeReader.reset();
+      } catch (e) {}
+
+      codeReader = createCodeReader_(tryHarder);
+      startDecodeFromVideoDevice_(null, video, tryHarder, false);
+      return;
+    }
+
+    stopScanner().then(function() {
+      closeScannerView_();
+      showMessage("error", "JAN読取の開始に失敗しました。\n\n原因：" + (err && err.message ? err.message : String(err)));
+    });
+  });
+}
+
+function switchToTryHarder_(video) {
+  if (!scannerRunning || scannerLocked || tryHarderEnabled || !video) return;
+
+  tryHarderEnabled = true;
+  scanMissCount = 0;
+
+  try {
+    if (codeReader) codeReader.reset();
+  } catch (e) {}
+
+  codeReader = createCodeReader_(true);
+  startDecodeFromVideoDevice_(null, video, true, false);
 }
 
 function sleep_(ms) {
@@ -676,6 +738,9 @@ async function stopScanner() {
   scannerLocked = false;
   lastScanJan = "";
   sameScanCount = 0;
+  scanMissCount = 0;
+  tryHarderEnabled = false;
+  scannerVideoReady = false;
 
   updateZoomButtons_();
 }
@@ -702,6 +767,8 @@ async function onScanSuccess(decodedText) {
     scannerLocked = false;
     return;
   }
+
+  scanMissCount = 0;
 
   if (jan === lastScanJan) {
     sameScanCount += 1;
