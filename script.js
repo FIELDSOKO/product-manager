@@ -1,5 +1,5 @@
 const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzN6ULmcDYUWLTmft67k_Wrra1WazV_aHroJPE63kQnFyLo9LW4_8Rb43qo9hxyTn9krw/exec";
-const APP_VERSION = "2026.07.02.01";
+const APP_VERSION = "2026.07.02.02";
 
 let selectedItem = null;
 let codeReader = null;
@@ -10,7 +10,10 @@ let sameScanCount = 0;
 let scanMissCount = 0;
 let tryHarderEnabled = false;
 let scannerVideoReady = false;
+let scannerReadyAt = 0;
+let decodeStartAt = 0;
 const TRY_HARDER_MISS_LIMIT = 36;
+const TRY_HARDER_START_GRACE_MS = 2500;
 
 let currentStream = null;
 let currentVideoTrack = null;
@@ -342,6 +345,8 @@ function clearAll() {
   scanMissCount = 0;
   tryHarderEnabled = false;
   scannerVideoReady = false;
+  scannerReadyAt = 0;
+  decodeStartAt = 0;
   currentSearchPayload = null;
   currentOffset = 0;
   hideMessage();
@@ -371,7 +376,13 @@ async function toggleScanner() {
     video.setAttribute("muted", "true");
     video.muted = true;
     video.autoplay = true;
-    video.srcObject = null;
+
+    if (video.srcObject) {
+      try {
+        video.srcObject.getTracks().forEach(function(track) { track.stop(); });
+      } catch (e) {}
+      video.srcObject = null;
+    }
 
     await waitForScannerViewReady_();
 
@@ -398,6 +409,7 @@ async function toggleScanner() {
     }
 
     scannerVideoReady = true;
+    scannerReadyAt = Date.now();
 
     currentStream = video.srcObject || null;
     currentVideoTrack = currentStream && currentStream.getVideoTracks ?
@@ -430,6 +442,8 @@ function resetVideoStreamForRetry_(video) {
   scanMissCount = 0;
   tryHarderEnabled = false;
   scannerVideoReady = false;
+  scannerReadyAt = 0;
+  decodeStartAt = 0;
   updateZoomButtons_();
 }
 
@@ -484,6 +498,23 @@ function createCodeReader_(tryHarder) {
   return new ZXing.BrowserMultiFormatReader(hints, 50);
 }
 
+function isVideoRenderable_(video) {
+  return !!(
+    video &&
+    video.srcObject &&
+    video.readyState >= 1 &&
+    video.videoWidth > 0 &&
+    video.videoHeight > 0
+  );
+}
+
+function canSwitchToTryHarder_(video) {
+  return scannerVideoReady &&
+    scannerReadyAt > 0 &&
+    (Date.now() - scannerReadyAt) >= TRY_HARDER_START_GRACE_MS &&
+    isVideoRenderable_(video);
+}
+
 function handleDecodeResult_(result, err, video) {
   if (result && !scannerLocked) {
     scannerLocked = true;
@@ -491,7 +522,9 @@ function handleDecodeResult_(result, err, video) {
     return;
   }
 
-  if (!result && err && scannerVideoReady && scannerRunning && !scannerLocked && !tryHarderEnabled) {
+  if (!result && err && scannerRunning && !scannerLocked && !tryHarderEnabled) {
+    if (!canSwitchToTryHarder_(video)) return;
+
     scanMissCount += 1;
 
     if (scanMissCount >= TRY_HARDER_MISS_LIMIT) {
@@ -502,6 +535,7 @@ function handleDecodeResult_(result, err, video) {
 
 function startDecodeFromVideoDevice_(deviceId, video, tryHarder, allowNullRetry) {
   if (!codeReader) codeReader = createCodeReader_(tryHarder);
+  decodeStartAt = Date.now();
 
   codeReader.decodeFromVideoDevice(deviceId || null, video, function(result, err) {
     handleDecodeResult_(result, err, video);
@@ -526,7 +560,7 @@ function startDecodeFromVideoDevice_(deviceId, video, tryHarder, allowNullRetry)
 }
 
 function switchToTryHarder_(video) {
-  if (!scannerRunning || scannerLocked || tryHarderEnabled || !video) return;
+  if (!scannerRunning || scannerLocked || tryHarderEnabled || !video || !canSwitchToTryHarder_(video)) return;
 
   tryHarderEnabled = true;
   scanMissCount = 0;
@@ -577,17 +611,8 @@ function waitForVideoReady_(video) {
     const startedAt = Date.now();
     const timeoutMs = 5000;
 
-    function hasVideoSize() {
-      return video &&
-        video.videoWidth > 0 &&
-        video.videoHeight > 0;
-    }
-
     function isReady() {
-      return video &&
-        video.srcObject &&
-        hasVideoSize() &&
-        video.readyState >= 1;
+      return isVideoRenderable_(video);
     }
 
     function finish() {
@@ -818,6 +843,8 @@ async function stopScanner() {
   scanMissCount = 0;
   tryHarderEnabled = false;
   scannerVideoReady = false;
+  scannerReadyAt = 0;
+  decodeStartAt = 0;
 
   updateZoomButtons_();
 }
