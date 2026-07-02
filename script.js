@@ -574,17 +574,22 @@ function waitForVideoReady_(video) {
     const startedAt = Date.now();
     const timeoutMs = 5000;
 
+    function hasVideoSize() {
+      return video &&
+        video.videoWidth > 0 &&
+        video.videoHeight > 0;
+    }
+
     function isReady() {
       return video &&
-        video.readyState >= 2 &&
-        video.videoWidth > 0 &&
-        video.videoHeight > 0 &&
-        !video.paused;
+        video.srcObject &&
+        hasVideoSize() &&
+        video.readyState >= 1;
     }
 
     function finish() {
       cleanup();
-      sleep_(120).then(resolve);
+      sleep_(20).then(resolve);
     }
 
     function failIfTimeout() {
@@ -602,7 +607,7 @@ function waitForVideoReady_(video) {
         return;
       }
       if (failIfTimeout()) return;
-      setTimeout(check, 50);
+      setTimeout(check, 30);
     }
 
     function cleanup() {
