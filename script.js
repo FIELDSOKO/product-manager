@@ -1,5 +1,5 @@
 const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzN6ULmcDYUWLTmft67k_Wrra1WazV_aHroJPE63kQnFyLo9LW4_8Rb43qo9hxyTn9krw/exec";
-const APP_VERSION = "2026.07.02.06";
+const APP_VERSION = "2026.07.02.07";
 
 let selectedItem = null;
 let codeReader = null;
@@ -14,8 +14,10 @@ let scannerReadyAt = 0;
 let decodeStartAt = 0;
 let lastScanPointInfo = null;
 let tryHarderSwitchedAt = 0;
+let lastBarcodeDetectedAt = 0;
 const TRY_HARDER_MISS_LIMIT = 36;
 const TRY_HARDER_START_GRACE_MS = 2500;
+const TRY_HARDER_NO_BARCODE_MS = 900;
 const SCAN_START_SUSPICIOUS_MS = 450;
 const TRY_HARDER_SETTLE_MS = 600;
 const SUSPICIOUS_CONFIRM_COUNT = 3;
@@ -356,6 +358,7 @@ function clearAll() {
   scannerReadyAt = 0;
   decodeStartAt = 0;
   tryHarderSwitchedAt = 0;
+  lastBarcodeDetectedAt = 0;
   lastScanPointInfo = null;
   currentSearchPayload = null;
   currentOffset = 0;
@@ -405,6 +408,7 @@ async function toggleScanner() {
     scanMissCount = 0;
     tryHarderEnabled = false;
     scannerVideoReady = false;
+    lastBarcodeDetectedAt = 0;
 
     setupScannerTouchEvents_();
 
@@ -456,6 +460,7 @@ function resetVideoStreamForRetry_(video) {
   scannerReadyAt = 0;
   decodeStartAt = 0;
   tryHarderSwitchedAt = 0;
+  lastBarcodeDetectedAt = 0;
   lastScanPointInfo = null;
   updateZoomButtons_();
 }
@@ -529,14 +534,29 @@ function canSwitchToTryHarder_(video) {
 }
 
 function handleDecodeResult_(result, err, video) {
-  if (result && !scannerLocked) {
-    scannerLocked = true;
-    onScanSuccess(result);
+  if (result) {
+    lastBarcodeDetectedAt = Date.now();
+    scanMissCount = 0;
+
+    if (!scannerLocked) {
+      scannerLocked = true;
+      onScanSuccess(result);
+    }
     return;
   }
 
   if (!result && err && scannerRunning && !scannerLocked && !tryHarderEnabled) {
     if (!canSwitchToTryHarder_(video)) return;
+
+    const now = Date.now();
+
+    // スキャン中に何かしらのバーコード結果が出ている間は、
+    // デコーダー再生成を伴うTRY_HARDER切替をしない。
+    // 本当にバーコード自体が検出されていない状態が続いた場合だけ切り替える。
+    if (lastBarcodeDetectedAt > 0 && now - lastBarcodeDetectedAt < TRY_HARDER_NO_BARCODE_MS) {
+      scanMissCount = 0;
+      return;
+    }
 
     scanMissCount += 1;
 
@@ -574,6 +594,11 @@ function startDecodeFromVideoDevice_(deviceId, video, tryHarder, allowNullRetry)
 
 function switchToTryHarder_(video) {
   if (!scannerRunning || scannerLocked || tryHarderEnabled || !video || !canSwitchToTryHarder_(video)) return;
+
+  if (lastBarcodeDetectedAt > 0 && Date.now() - lastBarcodeDetectedAt < TRY_HARDER_NO_BARCODE_MS) {
+    scanMissCount = 0;
+    return;
+  }
 
   tryHarderEnabled = true;
   tryHarderSwitchedAt = Date.now();
@@ -873,6 +898,7 @@ async function stopScanner() {
   scannerReadyAt = 0;
   decodeStartAt = 0;
   tryHarderSwitchedAt = 0;
+  lastBarcodeDetectedAt = 0;
   lastScanPointInfo = null;
 
   updateZoomButtons_();
