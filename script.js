@@ -482,6 +482,23 @@ function switchToTryHarder_(video) {
 
   codeReader = createCodeReader_(true);
   startDecodeFromVideoDevice_(null, video, true, false);
+  refreshCameraTrackAfterDecodeRestart_(video);
+}
+
+function refreshCameraTrackAfterDecodeRestart_(video) {
+  if (!video) return;
+
+  function refresh() {
+    if (!scannerRunning || scannerLocked) return;
+
+    currentStream = video.srcObject || null;
+    currentVideoTrack = currentStream && currentStream.getVideoTracks ?
+      (currentStream.getVideoTracks()[0] || null) : null;
+    setupCameraCapabilities_();
+  }
+
+  refresh();
+  waitForVideoReady_(video).then(refresh).catch(refresh);
 }
 
 function sleep_(ms) {
