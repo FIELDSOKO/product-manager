@@ -386,7 +386,13 @@ async function toggleScanner() {
     const deviceId = await getPreferredVideoDeviceId_();
     startDecodeFromVideoDevice_(deviceId || null, video, false, true);
 
-    await waitForVideoReady_(video);
+    try {
+      await waitForVideoReady_(video);
+    } catch (readyErr) {
+      if (!deviceId || !scannerRunning || scannerLocked) throw readyErr;
+      await retryScannerWithNullDeviceAfterVideoTimeout_(video, readyErr);
+    }
+
     scannerVideoReady = true;
     setScannerPreparing_(false);
 
@@ -399,6 +405,47 @@ async function toggleScanner() {
     await stopScanner();
     closeScannerView_();
     showMessage("error", "カメラを起動できませんでした。\n\n原因：" + (err && err.message ? err.message : String(err)));
+  }
+}
+
+function resetVideoStreamForRetry_(video) {
+  try {
+    const stream = video && video.srcObject ? video.srcObject : null;
+    if (stream && stream.getTracks) {
+      stream.getTracks().forEach(function(track) { track.stop(); });
+    }
+    if (video) video.srcObject = null;
+  } catch (e) {}
+
+  currentStream = null;
+  currentVideoTrack = null;
+  currentZoom = 1;
+  minZoom = 1;
+  maxZoom = 1;
+  pinchStartDistance = 0;
+  pinchStartZoom = 1;
+  scanMissCount = 0;
+  tryHarderEnabled = false;
+  scannerVideoReady = false;
+  updateZoomButtons_();
+}
+
+async function retryScannerWithNullDeviceAfterVideoTimeout_(video, originalErr) {
+  try {
+    if (codeReader) codeReader.reset();
+  } catch (e) {}
+
+  resetVideoStreamForRetry_(video);
+
+  if (!scannerRunning || scannerLocked) throw originalErr;
+
+  codeReader = createCodeReader_(false);
+  startDecodeFromVideoDevice_(null, video, false, false);
+
+  try {
+    await waitForVideoReady_(video);
+  } catch (retryErr) {
+    throw retryErr || originalErr;
   }
 }
 
