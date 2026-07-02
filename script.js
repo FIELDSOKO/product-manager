@@ -1,5 +1,5 @@
 const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzN6ULmcDYUWLTmft67k_Wrra1WazV_aHroJPE63kQnFyLo9LW4_8Rb43qo9hxyTn9krw/exec";
-const APP_VERSION = "2026.07.02.02";
+const APP_VERSION = "2026.07.02.04";
 
 let selectedItem = null;
 let codeReader = null;
@@ -12,6 +12,11 @@ let tryHarderEnabled = false;
 let scannerVideoReady = false;
 let scannerReadyAt = 0;
 let decodeStartAt = 0;
+let pendingConfirmJan = "";
+let pendingConfirmTimer = null;
+let pendingConfirmDeadline = 0;
+let lastScanPointInfo = null;
+const SCAN_CONFIRM_DELAY_MS = 100;
 const TRY_HARDER_MISS_LIMIT = 36;
 const TRY_HARDER_START_GRACE_MS = 2500;
 
@@ -347,6 +352,8 @@ function clearAll() {
   scannerVideoReady = false;
   scannerReadyAt = 0;
   decodeStartAt = 0;
+  clearPendingScanConfirm_();
+  lastScanPointInfo = null;
   currentSearchPayload = null;
   currentOffset = 0;
   hideMessage();
@@ -444,6 +451,8 @@ function resetVideoStreamForRetry_(video) {
   scannerVideoReady = false;
   scannerReadyAt = 0;
   decodeStartAt = 0;
+  clearPendingScanConfirm_();
+  lastScanPointInfo = null;
   updateZoomButtons_();
 }
 
@@ -518,7 +527,7 @@ function canSwitchToTryHarder_(video) {
 function handleDecodeResult_(result, err, video) {
   if (result && !scannerLocked) {
     scannerLocked = true;
-    onScanSuccess(result.getText());
+    onScanSuccess(result);
     return;
   }
 
@@ -845,9 +854,141 @@ async function stopScanner() {
   scannerVideoReady = false;
   scannerReadyAt = 0;
   decodeStartAt = 0;
+  clearPendingScanConfirm_();
+  lastScanPointInfo = null;
 
   updateZoomButtons_();
 }
+
+
+function getDecodedText_(scanResult) {
+  if (!scanResult) return "";
+
+  try {
+    if (typeof scanResult.getText === "function") {
+      return String(scanResult.getText() || "");
+    }
+  } catch (e) {}
+
+  return String(scanResult || "");
+}
+
+function getResultPointInfo_(scanResult) {
+  try {
+    if (!scanResult || typeof scanResult.getResultPoints !== "function") return null;
+
+    const points = scanResult.getResultPoints() || [];
+    const validPoints = points.map(function(point) {
+      if (!point) return null;
+
+      const x = typeof point.getX === "function" ? Number(point.getX()) : Number(point.x);
+      const y = typeof point.getY === "function" ? Number(point.getY()) : Number(point.y);
+
+      if (!isFinite(x) || !isFinite(y)) return null;
+      return { x: x, y: y };
+    }).filter(function(point) {
+      return !!point;
+    });
+
+    if (validPoints.length < 2) return null;
+
+    let minX = validPoints[0].x;
+    let maxX = validPoints[0].x;
+    let minY = validPoints[0].y;
+    let maxY = validPoints[0].y;
+    let sumX = 0;
+    let sumY = 0;
+
+    validPoints.forEach(function(point) {
+      minX = Math.min(minX, point.x);
+      maxX = Math.max(maxX, point.x);
+      minY = Math.min(minY, point.y);
+      maxY = Math.max(maxY, point.y);
+      sumX += point.x;
+      sumY += point.y;
+    });
+
+    const width = maxX - minX;
+    const height = maxY - minY;
+    const diagonal = Math.sqrt(width * width + height * height);
+
+    return {
+      count: validPoints.length,
+      centerX: sumX / validPoints.length,
+      centerY: sumY / validPoints.length,
+      width: width,
+      height: height,
+      diagonal: diagonal
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
+function isResultPointStable_(prev, current) {
+  if (!prev || !current) return true;
+  if (current.diagonal <= 0 || prev.diagonal <= 0) return true;
+
+  const dx = current.centerX - prev.centerX;
+  const dy = current.centerY - prev.centerY;
+  const centerMove = Math.sqrt(dx * dx + dy * dy);
+  const baseSize = Math.max(prev.diagonal, current.diagonal, 1);
+  const sizeDiff = Math.abs(current.diagonal - prev.diagonal) / baseSize;
+
+  return centerMove <= baseSize * 0.45 && sizeDiff <= 0.55;
+}
+
+function hasUsableResultPoints_(pointInfo) {
+  if (!pointInfo) return true;
+  return pointInfo.diagonal >= 24;
+}
+
+function clearPendingScanConfirm_() {
+  if (pendingConfirmTimer) {
+    clearTimeout(pendingConfirmTimer);
+  }
+
+  pendingConfirmTimer = null;
+  pendingConfirmJan = "";
+  pendingConfirmDeadline = 0;
+}
+
+function startPendingScanConfirm_(jan) {
+  clearPendingScanConfirm_();
+
+  pendingConfirmJan = jan;
+  pendingConfirmDeadline = Date.now() + SCAN_CONFIRM_DELAY_MS;
+
+  pendingConfirmTimer = setTimeout(function() {
+    if (pendingConfirmJan === jan) {
+      clearPendingScanConfirm_();
+      lastScanJan = "";
+      sameScanCount = 0;
+      lastScanPointInfo = null;
+    }
+  }, SCAN_CONFIRM_DELAY_MS);
+}
+
+async function confirmScanJan_(jan) {
+  if (!scannerRunning || scannerLocked) return;
+
+  scannerLocked = true;
+  clearPendingScanConfirm_();
+
+  document.getElementById("janInput").value = jan;
+  document.getElementById("textInput").value = "";
+
+  lastScanJan = "";
+  sameScanCount = 0;
+  scanMissCount = 0;
+  lastScanPointInfo = null;
+
+  await stopScanner();
+  closeScannerView_();
+
+  searchProduct();
+}
+
 
 function isValidJan13(jan) {
   if (!/^\d{13}$/.test(jan)) return false;
@@ -863,41 +1004,60 @@ function isValidJan13(jan) {
   return checkDigit === Number(jan.charAt(12));
 }
 
-async function onScanSuccess(decodedText) {
-  const text = String(decodedText || "").trim();
+async function onScanSuccess(scanResult) {
+  const text = getDecodedText_(scanResult).trim();
   const jan = text.replace(/[^\d]/g, "");
+  const pointInfo = getResultPointInfo_(scanResult);
+  const stablePoints = isResultPointStable_(lastScanPointInfo, pointInfo);
+  const usablePoints = hasUsableResultPoints_(pointInfo);
 
-  if (!isValidJan13(jan)) {
+  if (!isValidJan13(jan) || !usablePoints) {
     scannerLocked = false;
     return;
   }
 
   scanMissCount = 0;
 
-  if (jan === lastScanJan) {
+  if (pendingConfirmJan) {
+    if (Date.now() > pendingConfirmDeadline) {
+      clearPendingScanConfirm_();
+      lastScanJan = jan;
+      sameScanCount = 1;
+      lastScanPointInfo = pointInfo;
+      scannerLocked = false;
+      return;
+    }
+
+    if (jan === pendingConfirmJan && stablePoints) {
+      await confirmScanJan_(jan);
+      return;
+    }
+
+    clearPendingScanConfirm_();
+    lastScanJan = jan;
+    sameScanCount = 1;
+    lastScanPointInfo = pointInfo;
+    scannerLocked = false;
+    return;
+  }
+
+  if (jan === lastScanJan && stablePoints) {
     sameScanCount += 1;
   } else {
     lastScanJan = jan;
     sameScanCount = 1;
   }
 
+  lastScanPointInfo = pointInfo;
+
   if (sameScanCount < 2) {
     scannerLocked = false;
     return;
   }
 
-  document.getElementById("janInput").value = jan;
-  document.getElementById("textInput").value = "";
-
-  lastScanJan = "";
-  sameScanCount = 0;
-
-  await stopScanner();
-  closeScannerView_();
-
-  searchProduct();
+  startPendingScanConfirm_(jan);
+  scannerLocked = false;
 }
-
 function escapeHtml(value) {
   return String(value || "")
     .replace(/&/g, "&amp;")
