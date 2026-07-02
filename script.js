@@ -533,62 +533,8 @@ function setupCameraCapabilities_() {
       currentZoom = minZoom;
     }
 
-    applyCameraStabilizeConstraints_();
     updateZoomButtons_();
   } catch (e) {}
-}
-
-function applyCameraStabilizeConstraints_() {
-  if (!currentVideoTrack || !currentVideoTrack.applyConstraints) return;
-
-  const constraints = {
-    width: { ideal: 1280 },
-    height: { ideal: 720 }
-  };
-
-  const continuous = buildContinuousCameraAdvanced_();
-  if (continuous) constraints.advanced = [continuous];
-
-  currentVideoTrack.applyConstraints(constraints).catch(function() {
-    if (!continuous) return;
-    currentVideoTrack.applyConstraints({ advanced: [continuous] }).catch(function() {});
-  });
-}
-
-function buildContinuousCameraAdvanced_() {
-  if (!currentVideoTrack || !currentVideoTrack.getCapabilities) return null;
-
-  try {
-    const caps = currentVideoTrack.getCapabilities();
-    const advanced = {};
-
-    if (Array.isArray(caps.focusMode) && caps.focusMode.indexOf("continuous") >= 0) {
-      advanced.focusMode = "continuous";
-    }
-
-    if (Array.isArray(caps.exposureMode) && caps.exposureMode.indexOf("continuous") >= 0) {
-      advanced.exposureMode = "continuous";
-    }
-
-    if (Array.isArray(caps.whiteBalanceMode) && caps.whiteBalanceMode.indexOf("continuous") >= 0) {
-      advanced.whiteBalanceMode = "continuous";
-    }
-
-    return Object.keys(advanced).length ? advanced : null;
-  } catch (e) {
-    return null;
-  }
-}
-
-function restoreContinuousFocus_() {
-  if (!currentVideoTrack || !currentVideoTrack.applyConstraints) return;
-
-  const continuous = buildContinuousCameraAdvanced_();
-  if (!continuous) return;
-
-  currentVideoTrack.applyConstraints({
-    advanced: [continuous]
-  }).catch(function() {});
 }
 
 function setZoomLevel(level) {
@@ -693,28 +639,18 @@ function requestTapFocus_(clientX, clientY) {
 
   try {
     const rect = box.getBoundingClientRect();
-    const x = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-    const y = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
-    const advanced = {};
-
-    if (currentVideoTrack.getCapabilities) {
-      const caps = currentVideoTrack.getCapabilities();
-
-      if (Array.isArray(caps.focusMode) && caps.focusMode.indexOf("single-shot") >= 0) {
-        advanced.focusMode = "single-shot";
-      }
-    } else {
-      advanced.focusMode = "single-shot";
-    }
-
-    advanced.pointsOfInterest = [{ x: x, y: y }];
+    const x = (clientX - rect.left) / rect.width;
+    const y = (clientY - rect.top) / rect.height;
 
     currentVideoTrack.applyConstraints({
-      advanced: [advanced]
-    }).then(function() {
-      setTimeout(restoreContinuousFocus_, 900);
+      advanced: [
+        { focusMode: "single-shot" },
+        { pointsOfInterest: [{ x: x, y: y }] }
+      ]
     }).catch(function() {
-      restoreContinuousFocus_();
+      currentVideoTrack.applyConstraints({
+        advanced: [{ focusMode: "continuous" }]
+      }).catch(function() {});
     });
   } catch (e) {}
 }
