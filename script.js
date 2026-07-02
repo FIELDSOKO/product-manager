@@ -1,5 +1,5 @@
 const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzN6ULmcDYUWLTmft67k_Wrra1WazV_aHroJPE63kQnFyLo9LW4_8Rb43qo9hxyTn9krw/exec";
-const APP_VERSION = "2026.07.02.08";
+const APP_VERSION = "2026.07.02.09";
 
 let selectedItem = null;
 let codeReader = null;
@@ -597,59 +597,12 @@ function hasRecentBarcodeDetection_() {
     Date.now() - lastBarcodeDetectedAt < TRY_HARDER_NO_BARCODE_MS;
 }
 
-function stopDecodeLoopKeepVideo_() {
-  if (!codeReader) return false;
-
-  // reset() は video.srcObject / MediaStream 側まで止める可能性があり、
-  // スキャン中の黒いチラつき原因になるため、映像を止めない停止方法を優先する。
-  try {
-    if (typeof codeReader.stopContinuousDecode === "function") {
-      codeReader.stopContinuousDecode();
-      return true;
-    }
-  } catch (e) {}
-
-  try {
-    if (typeof codeReader.stopAsyncDecode === "function") {
-      codeReader.stopAsyncDecode();
-      return true;
-    }
-  } catch (e) {}
-
-  return false;
-}
-
-function startDecodeFromCurrentVideoElement_(video, tryHarder) {
-  if (!video) return false;
-
-  try {
-    if (codeReader && typeof codeReader.decodeFromVideoElement === "function") {
-      decodeStartAt = Date.now();
-      codeReader.decodeFromVideoElement(video, function(result, err) {
-        handleDecodeResult_(result, err, video);
-      });
-      return true;
-    }
-  } catch (e) {}
-
-  try {
-    if (codeReader && typeof codeReader.decodeFromVideoElementContinuously === "function") {
-      decodeStartAt = Date.now();
-      codeReader.decodeFromVideoElementContinuously(video, function(result, err) {
-        handleDecodeResult_(result, err, video);
-      });
-      return true;
-    }
-  } catch (e) {}
-
-  return false;
-}
 
 function switchToTryHarder_(video) {
   if (!scannerRunning || scannerLocked || tryHarderEnabled || !video || !canSwitchToTryHarder_(video)) return;
 
   // バーコード結果が直近で出ている間は、スキャン中と判断して切り替えない。
-  // ここで切り替えると codeReader.reset() 系の処理で一瞬黒くなる。
+  // 本当にバーコード自体が検出されていない状態が続いた場合だけTRY_HARDERへ切り替える。
   if (hasRecentBarcodeDetection_()) {
     scanMissCount = 0;
     return;
@@ -659,18 +612,6 @@ function switchToTryHarder_(video) {
   tryHarderSwitchedAt = Date.now();
   scanMissCount = 0;
 
-  const stoppedWithoutVideoReset = stopDecodeLoopKeepVideo_();
-  codeReader = createCodeReader_(true);
-
-  // 既存の video / MediaStream をそのまま使って解析だけTRY_HARDERへ切り替える。
-  // これにより decodeFromVideoDevice() の再取得による黒チラつきを避ける。
-  if (stoppedWithoutVideoReset && startDecodeFromCurrentVideoElement_(video, true)) {
-    refreshCameraTrackAfterDecodeRestart_(video);
-    return;
-  }
-
-  // 古いZXingで解析ループだけを止めるAPIが無い場合のみフォールバック。
-  // ただし上の条件により、バーコード検出中にはここへ来ない。
   try {
     if (codeReader) codeReader.reset();
   } catch (e) {}
