@@ -16,6 +16,7 @@ body {
   font-size: 16px;
 }
 
+body.scanner-overlay,
 body.scanner-open {
   padding: 0;
   overflow: hidden;
@@ -340,6 +341,7 @@ body.scanner-preparing #scannerBox::after {
   body { padding: 10px; }
   .grid { grid-template-columns: 1fr; gap: 0; }
   .btn-row { grid-template-columns: 1fr; }
+  body.scanner-overlay,
   body.scanner-open { padding: 0; }
   .scannerControls { bottom: calc(82px + env(safe-area-inset-bottom)); }
 }

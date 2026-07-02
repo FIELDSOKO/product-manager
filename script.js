@@ -623,17 +623,26 @@ function waitForVideoReady_(video) {
 function openScannerView_() {
   const box = document.getElementById("scannerBox");
   setScannerPreparing_(true);
-  document.body.classList.add("scanner-open");
+  document.body.classList.add("scanner-overlay");
   if (box) {
     box.classList.add("show");
     box.setAttribute("aria-hidden", "false");
   }
+
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() {
+      if (document.body.classList.contains("scanner-overlay")) {
+        document.body.classList.add("scanner-open");
+      }
+    });
+  });
 }
 
 function closeScannerView_() {
   const box = document.getElementById("scannerBox");
   setScannerPreparing_(false);
   document.body.classList.remove("scanner-open");
+  document.body.classList.remove("scanner-overlay");
   if (box) {
     box.classList.remove("show");
     box.setAttribute("aria-hidden", "true");
