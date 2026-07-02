@@ -16,7 +16,6 @@ body {
   font-size: 16px;
 }
 
-body.scanner-overlay,
 body.scanner-open {
   padding: 0;
   overflow: hidden;
@@ -141,39 +140,6 @@ button {
   background: #000;
 }
 
-/* カメラ起動準備中の表示制御 */
-#readerVideo {
-  transition: opacity 120ms ease-out;
-}
-
-body.scanner-preparing #readerVideo {
-  opacity: 0.01;
-}
-
-body.scanner-preparing .scannerControls,
-body.scanner-preparing .focusMark {
-  visibility: hidden;
-}
-
-body.scanner-preparing #scannerBox::after {
-  content: "カメラ起動中…";
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 150px;
-  padding: 12px 18px;
-  border-radius: 999px;
-  background: rgba(0,0,0,0.58);
-  color: rgba(255,255,255,0.94);
-  font-weight: 900;
-  font-size: 15px;
-  z-index: 7;
-  pointer-events: none;
-}
 
 .scannerControls {
   position: absolute;
@@ -346,7 +312,6 @@ body.scanner-preparing #scannerBox::after {
   body { padding: 10px; }
   .grid { grid-template-columns: 1fr; gap: 0; }
   .btn-row { grid-template-columns: 1fr; }
-  body.scanner-overlay,
   body.scanner-open { padding: 0; }
   .scannerControls { bottom: calc(82px + env(safe-area-inset-bottom)); }
 }

@@ -341,44 +341,6 @@ function clearAll() {
   document.getElementById("textInput").focus();
 }
 
-function setScannerPreparing_(preparing) {
-  document.body.classList.toggle("scanner-preparing", !!preparing);
-}
-
-function revealScannerWhenCameraStarts_(video) {
-  if (!video) return;
-
-  let revealed = false;
-
-  function reveal() {
-    if (revealed || !scannerRunning || scannerLocked) return;
-    revealed = true;
-    cleanup();
-    setScannerPreparing_(false);
-  }
-
-  function check() {
-    if (video.srcObject || video.readyState >= 1 || (video.videoWidth > 0 && video.videoHeight > 0)) {
-      reveal();
-    }
-  }
-
-  function cleanup() {
-    video.removeEventListener("loadedmetadata", reveal);
-    video.removeEventListener("loadeddata", reveal);
-    video.removeEventListener("canplay", reveal);
-    video.removeEventListener("playing", reveal);
-  }
-
-  video.addEventListener("loadedmetadata", reveal);
-  video.addEventListener("loadeddata", reveal);
-  video.addEventListener("canplay", reveal);
-  video.addEventListener("playing", reveal);
-
-  check();
-  setTimeout(check, 120);
-  setTimeout(reveal, 450);
-}
 
 async function toggleScanner() {
   if (scannerRunning) {
@@ -420,7 +382,6 @@ async function toggleScanner() {
 
     const deviceId = await getPreferredVideoDeviceId_();
     startDecodeFromVideoDevice_(deviceId || null, video, false, true);
-    revealScannerWhenCameraStarts_(video);
 
     try {
       await waitForVideoReady_(video);
@@ -430,7 +391,6 @@ async function toggleScanner() {
     }
 
     scannerVideoReady = true;
-    setScannerPreparing_(false);
 
     currentStream = video.srcObject || null;
     currentVideoTrack = currentStream && currentStream.getVideoTracks ?
@@ -477,7 +437,6 @@ async function retryScannerWithNullDeviceAfterVideoTimeout_(video, originalErr) 
 
   codeReader = createCodeReader_(false);
   startDecodeFromVideoDevice_(null, video, false, false);
-  revealScannerWhenCameraStarts_(video);
 
   try {
     await waitForVideoReady_(video);
@@ -664,27 +623,16 @@ function waitForVideoReady_(video) {
 
 function openScannerView_() {
   const box = document.getElementById("scannerBox");
-  setScannerPreparing_(true);
-  document.body.classList.add("scanner-overlay");
+  document.body.classList.add("scanner-open");
   if (box) {
     box.classList.add("show");
     box.setAttribute("aria-hidden", "false");
   }
-
-  requestAnimationFrame(function() {
-    requestAnimationFrame(function() {
-      if (document.body.classList.contains("scanner-overlay")) {
-        document.body.classList.add("scanner-open");
-      }
-    });
-  });
 }
 
 function closeScannerView_() {
   const box = document.getElementById("scannerBox");
-  setScannerPreparing_(false);
   document.body.classList.remove("scanner-open");
-  document.body.classList.remove("scanner-overlay");
   if (box) {
     box.classList.remove("show");
     box.setAttribute("aria-hidden", "true");
