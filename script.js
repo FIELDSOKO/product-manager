@@ -1,5 +1,5 @@
 const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzN6ULmcDYUWLTmft67k_Wrra1WazV_aHroJPE63kQnFyLo9LW4_8Rb43qo9hxyTn9krw/exec";
-const APP_VERSION = "2026.07.02.04";
+const APP_VERSION = "2026.07.02.05";
 
 let selectedItem = null;
 let codeReader = null;
@@ -12,13 +12,13 @@ let tryHarderEnabled = false;
 let scannerVideoReady = false;
 let scannerReadyAt = 0;
 let decodeStartAt = 0;
-let pendingConfirmJan = "";
-let pendingConfirmTimer = null;
-let pendingConfirmDeadline = 0;
 let lastScanPointInfo = null;
-const SCAN_CONFIRM_DELAY_MS = 100;
+let tryHarderSwitchedAt = 0;
 const TRY_HARDER_MISS_LIMIT = 36;
 const TRY_HARDER_START_GRACE_MS = 2500;
+const SCAN_START_SUSPICIOUS_MS = 450;
+const TRY_HARDER_SETTLE_MS = 600;
+const SUSPICIOUS_CONFIRM_COUNT = 3;
 
 let currentStream = null;
 let currentVideoTrack = null;
@@ -352,7 +352,7 @@ function clearAll() {
   scannerVideoReady = false;
   scannerReadyAt = 0;
   decodeStartAt = 0;
-  clearPendingScanConfirm_();
+  tryHarderSwitchedAt = 0;
   lastScanPointInfo = null;
   currentSearchPayload = null;
   currentOffset = 0;
@@ -451,7 +451,7 @@ function resetVideoStreamForRetry_(video) {
   scannerVideoReady = false;
   scannerReadyAt = 0;
   decodeStartAt = 0;
-  clearPendingScanConfirm_();
+  tryHarderSwitchedAt = 0;
   lastScanPointInfo = null;
   updateZoomButtons_();
 }
@@ -572,6 +572,7 @@ function switchToTryHarder_(video) {
   if (!scannerRunning || scannerLocked || tryHarderEnabled || !video || !canSwitchToTryHarder_(video)) return;
 
   tryHarderEnabled = true;
+  tryHarderSwitchedAt = Date.now();
   scanMissCount = 0;
 
   try {
@@ -854,7 +855,7 @@ async function stopScanner() {
   scannerVideoReady = false;
   scannerReadyAt = 0;
   decodeStartAt = 0;
-  clearPendingScanConfirm_();
+  tryHarderSwitchedAt = 0;
   lastScanPointInfo = null;
 
   updateZoomButtons_();
@@ -935,45 +936,48 @@ function isResultPointStable_(prev, current) {
   const baseSize = Math.max(prev.diagonal, current.diagonal, 1);
   const sizeDiff = Math.abs(current.diagonal - prev.diagonal) / baseSize;
 
-  return centerMove <= baseSize * 0.45 && sizeDiff <= 0.55;
+  return centerMove <= baseSize * 0.55 && sizeDiff <= 0.65;
 }
 
-function hasUsableResultPoints_(pointInfo) {
-  if (!pointInfo) return true;
-  return pointInfo.diagonal >= 24;
+function isResultPointExtreme_(pointInfo) {
+  // resultPointsが取れない端末・状況では、通常読取を止めない。
+  if (!pointInfo) return false;
+  return pointInfo.diagonal > 0 && pointInfo.diagonal < 18;
 }
 
-function clearPendingScanConfirm_() {
-  if (pendingConfirmTimer) {
-    clearTimeout(pendingConfirmTimer);
+function isScanStartSuspicious_() {
+  const now = Date.now();
+
+  if (scannerReadyAt > 0 && now - scannerReadyAt < SCAN_START_SUSPICIOUS_MS) {
+    return true;
   }
 
-  pendingConfirmTimer = null;
-  pendingConfirmJan = "";
-  pendingConfirmDeadline = 0;
+  if (tryHarderSwitchedAt > 0 && now - tryHarderSwitchedAt < TRY_HARDER_SETTLE_MS) {
+    return true;
+  }
+
+  return false;
 }
 
-function startPendingScanConfirm_(jan) {
-  clearPendingScanConfirm_();
+function isSuspiciousScan_(jan, pointInfo, stablePoints) {
+  if (isResultPointExtreme_(pointInfo)) return true;
+  if (isScanStartSuspicious_()) return true;
 
-  pendingConfirmJan = jan;
-  pendingConfirmDeadline = Date.now() + SCAN_CONFIRM_DELAY_MS;
+  // 同じ読取中にJANが急に変わり、かつ位置も安定していない場合だけ怪しい扱いにする。
+  if (lastScanJan && jan !== lastScanJan && sameScanCount > 0 && !stablePoints) {
+    return true;
+  }
 
-  pendingConfirmTimer = setTimeout(function() {
-    if (pendingConfirmJan === jan) {
-      clearPendingScanConfirm_();
-      lastScanJan = "";
-      sameScanCount = 0;
-      lastScanPointInfo = null;
-    }
-  }, SCAN_CONFIRM_DELAY_MS);
+  // バーコード位置・サイズが大きく動いた場合だけ追加確認対象。
+  if (!stablePoints) return true;
+
+  return false;
 }
 
 async function confirmScanJan_(jan) {
-  if (!scannerRunning || scannerLocked) return;
+  if (!scannerRunning) return;
 
   scannerLocked = true;
-  clearPendingScanConfirm_();
 
   document.getElementById("janInput").value = jan;
   document.getElementById("textInput").value = "";
@@ -982,6 +986,7 @@ async function confirmScanJan_(jan) {
   sameScanCount = 0;
   scanMissCount = 0;
   lastScanPointInfo = null;
+  tryHarderSwitchedAt = 0;
 
   await stopScanner();
   closeScannerView_();
@@ -1009,39 +1014,17 @@ async function onScanSuccess(scanResult) {
   const jan = text.replace(/[^\d]/g, "");
   const pointInfo = getResultPointInfo_(scanResult);
   const stablePoints = isResultPointStable_(lastScanPointInfo, pointInfo);
-  const usablePoints = hasUsableResultPoints_(pointInfo);
 
-  if (!isValidJan13(jan) || !usablePoints) {
+  if (!isValidJan13(jan)) {
     scannerLocked = false;
     return;
   }
 
   scanMissCount = 0;
 
-  if (pendingConfirmJan) {
-    if (Date.now() > pendingConfirmDeadline) {
-      clearPendingScanConfirm_();
-      lastScanJan = jan;
-      sameScanCount = 1;
-      lastScanPointInfo = pointInfo;
-      scannerLocked = false;
-      return;
-    }
+  const suspicious = isSuspiciousScan_(jan, pointInfo, stablePoints);
 
-    if (jan === pendingConfirmJan && stablePoints) {
-      await confirmScanJan_(jan);
-      return;
-    }
-
-    clearPendingScanConfirm_();
-    lastScanJan = jan;
-    sameScanCount = 1;
-    lastScanPointInfo = pointInfo;
-    scannerLocked = false;
-    return;
-  }
-
-  if (jan === lastScanJan && stablePoints) {
+  if (jan === lastScanJan) {
     sameScanCount += 1;
   } else {
     lastScanJan = jan;
@@ -1050,12 +1033,13 @@ async function onScanSuccess(scanResult) {
 
   lastScanPointInfo = pointInfo;
 
-  if (sameScanCount < 2) {
-    scannerLocked = false;
+  const requiredCount = suspicious ? SUSPICIOUS_CONFIRM_COUNT : 2;
+
+  if (sameScanCount >= requiredCount) {
+    await confirmScanJan_(jan);
     return;
   }
 
-  startPendingScanConfirm_(jan);
   scannerLocked = false;
 }
 function escapeHtml(value) {
