@@ -341,6 +341,10 @@ function clearAll() {
   document.getElementById("textInput").focus();
 }
 
+function setScannerPreparing_(preparing) {
+  document.body.classList.toggle("scanner-preparing", !!preparing);
+}
+
 async function toggleScanner() {
   if (scannerRunning) {
     await closeScannerManual();
@@ -384,6 +388,7 @@ async function toggleScanner() {
 
     await waitForVideoReady_(video);
     scannerVideoReady = true;
+    setScannerPreparing_(false);
 
     currentStream = video.srcObject || null;
     currentVideoTrack = currentStream && currentStream.getVideoTracks ?
@@ -570,6 +575,7 @@ function waitForVideoReady_(video) {
 
 function openScannerView_() {
   const box = document.getElementById("scannerBox");
+  setScannerPreparing_(true);
   document.body.classList.add("scanner-open");
   if (box) {
     box.classList.add("show");
@@ -579,6 +585,7 @@ function openScannerView_() {
 
 function closeScannerView_() {
   const box = document.getElementById("scannerBox");
+  setScannerPreparing_(false);
   document.body.classList.remove("scanner-open");
   if (box) {
     box.classList.remove("show");
