@@ -1,5 +1,5 @@
 const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzN6ULmcDYUWLTmft67k_Wrra1WazV_aHroJPE63kQnFyLo9LW4_8Rb43qo9hxyTn9krw/exec";
-const APP_VERSION = "2026.07.02.09";
+const APP_VERSION = "2026.07.02.11";
 
 let selectedItem = null;
 let codeReader = null;
@@ -7,19 +7,11 @@ let scannerRunning = false;
 let scannerLocked = false;
 let lastScanJan = "";
 let sameScanCount = 0;
-let scanMissCount = 0;
-let tryHarderEnabled = false;
 let scannerVideoReady = false;
 let scannerReadyAt = 0;
 let decodeStartAt = 0;
 let lastScanPointInfo = null;
-let tryHarderSwitchedAt = 0;
-let lastBarcodeDetectedAt = 0;
-const TRY_HARDER_MISS_LIMIT = 36;
-const TRY_HARDER_START_GRACE_MS = 2500;
-const TRY_HARDER_NO_BARCODE_MS = 900;
 const SCAN_START_SUSPICIOUS_MS = 450;
-const TRY_HARDER_SETTLE_MS = 600;
 const SUSPICIOUS_CONFIRM_COUNT = 3;
 const GUIDE_ROI_X_MARGIN_RATIO = 0.12;
 const GUIDE_ROI_Y_MARGIN_RATIO = 0.34;
@@ -352,13 +344,9 @@ function clearAll() {
   document.getElementById("resultList").innerHTML = "";
   lastScanJan = "";
   sameScanCount = 0;
-  scanMissCount = 0;
-  tryHarderEnabled = false;
   scannerVideoReady = false;
   scannerReadyAt = 0;
   decodeStartAt = 0;
-  tryHarderSwitchedAt = 0;
-  lastBarcodeDetectedAt = 0;
   lastScanPointInfo = null;
   currentSearchPayload = null;
   currentOffset = 0;
@@ -399,21 +387,18 @@ async function toggleScanner() {
 
     await waitForScannerViewReady_();
 
-    codeReader = createCodeReader_(false);
+    codeReader = createCodeReader_(true);
 
     scannerRunning = true;
     scannerLocked = false;
     lastScanJan = "";
     sameScanCount = 0;
-    scanMissCount = 0;
-    tryHarderEnabled = false;
-    scannerVideoReady = false;
-    lastBarcodeDetectedAt = 0;
-
+      scannerVideoReady = false;
+  
     setupScannerTouchEvents_();
 
     const deviceId = await getPreferredVideoDeviceId_();
-    startDecodeFromVideoDevice_(deviceId || null, video, false, true);
+    startDecodeFromVideoDevice_(deviceId || null, video, true, true);
 
     try {
       await waitForVideoReady_(video);
@@ -454,13 +439,9 @@ function resetVideoStreamForRetry_(video) {
   maxZoom = 1;
   pinchStartDistance = 0;
   pinchStartZoom = 1;
-  scanMissCount = 0;
-  tryHarderEnabled = false;
   scannerVideoReady = false;
   scannerReadyAt = 0;
   decodeStartAt = 0;
-  tryHarderSwitchedAt = 0;
-  lastBarcodeDetectedAt = 0;
   lastScanPointInfo = null;
   updateZoomButtons_();
 }
@@ -474,8 +455,8 @@ async function retryScannerWithNullDeviceAfterVideoTimeout_(video, originalErr) 
 
   if (!scannerRunning || scannerLocked) throw originalErr;
 
-  codeReader = createCodeReader_(false);
-  startDecodeFromVideoDevice_(null, video, false, false);
+  codeReader = createCodeReader_(true);
+  startDecodeFromVideoDevice_(null, video, true, false);
 
   try {
     await waitForVideoReady_(video);
@@ -526,43 +507,10 @@ function isVideoRenderable_(video) {
   );
 }
 
-function canSwitchToTryHarder_(video) {
-  return scannerVideoReady &&
-    scannerReadyAt > 0 &&
-    (Date.now() - scannerReadyAt) >= TRY_HARDER_START_GRACE_MS &&
-    isVideoRenderable_(video);
-}
-
 function handleDecodeResult_(result, err, video) {
-  if (result) {
-    lastBarcodeDetectedAt = Date.now();
-    scanMissCount = 0;
-
-    if (!scannerLocked) {
-      scannerLocked = true;
-      onScanSuccess(result);
-    }
-    return;
-  }
-
-  if (!result && err && scannerRunning && !scannerLocked && !tryHarderEnabled) {
-    if (!canSwitchToTryHarder_(video)) return;
-
-    const now = Date.now();
-
-    // スキャン中に何かしらのバーコード結果が出ている間は、
-    // デコーダー再生成を伴うTRY_HARDER切替をしない。
-    // 本当にバーコード自体が検出されていない状態が続いた場合だけ切り替える。
-    if (lastBarcodeDetectedAt > 0 && now - lastBarcodeDetectedAt < TRY_HARDER_NO_BARCODE_MS) {
-      scanMissCount = 0;
-      return;
-    }
-
-    scanMissCount += 1;
-
-    if (scanMissCount >= TRY_HARDER_MISS_LIMIT) {
-      switchToTryHarder_(video);
-    }
+  if (result && !scannerLocked) {
+    scannerLocked = true;
+    onScanSuccess(result);
   }
 }
 
@@ -590,51 +538,6 @@ function startDecodeFromVideoDevice_(deviceId, video, tryHarder, allowNullRetry)
       showMessage("error", "JAN読取の開始に失敗しました。\n\n原因：" + (err && err.message ? err.message : String(err)));
     });
   });
-}
-
-function hasRecentBarcodeDetection_() {
-  return lastBarcodeDetectedAt > 0 &&
-    Date.now() - lastBarcodeDetectedAt < TRY_HARDER_NO_BARCODE_MS;
-}
-
-
-function switchToTryHarder_(video) {
-  if (!scannerRunning || scannerLocked || tryHarderEnabled || !video || !canSwitchToTryHarder_(video)) return;
-
-  // バーコード結果が直近で出ている間は、スキャン中と判断して切り替えない。
-  // 本当にバーコード自体が検出されていない状態が続いた場合だけTRY_HARDERへ切り替える。
-  if (hasRecentBarcodeDetection_()) {
-    scanMissCount = 0;
-    return;
-  }
-
-  tryHarderEnabled = true;
-  tryHarderSwitchedAt = Date.now();
-  scanMissCount = 0;
-
-  try {
-    if (codeReader) codeReader.reset();
-  } catch (e) {}
-
-  codeReader = createCodeReader_(true);
-  startDecodeFromVideoDevice_(null, video, true, false);
-  refreshCameraTrackAfterDecodeRestart_(video);
-}
-
-function refreshCameraTrackAfterDecodeRestart_(video) {
-  if (!video) return;
-
-  function refresh() {
-    if (!scannerRunning || scannerLocked) return;
-
-    currentStream = video.srcObject || null;
-    currentVideoTrack = currentStream && currentStream.getVideoTracks ?
-      (currentStream.getVideoTracks()[0] || null) : null;
-    setupCameraCapabilities_();
-  }
-
-  refresh();
-  waitForVideoReady_(video).then(refresh).catch(refresh);
 }
 
 function sleep_(ms) {
@@ -900,13 +803,9 @@ async function stopScanner() {
   scannerLocked = false;
   lastScanJan = "";
   sameScanCount = 0;
-  scanMissCount = 0;
-  tryHarderEnabled = false;
   scannerVideoReady = false;
   scannerReadyAt = 0;
   decodeStartAt = 0;
-  tryHarderSwitchedAt = 0;
-  lastBarcodeDetectedAt = 0;
   lastScanPointInfo = null;
 
   updateZoomButtons_();
@@ -1046,10 +945,6 @@ function isScanStartSuspicious_() {
     return true;
   }
 
-  if (tryHarderSwitchedAt > 0 && now - tryHarderSwitchedAt < TRY_HARDER_SETTLE_MS) {
-    return true;
-  }
-
   return false;
 }
 
@@ -1079,9 +974,7 @@ async function confirmScanJan_(jan) {
 
   lastScanJan = "";
   sameScanCount = 0;
-  scanMissCount = 0;
   lastScanPointInfo = null;
-  tryHarderSwitchedAt = 0;
 
   await stopScanner();
   closeScannerView_();
@@ -1116,7 +1009,6 @@ async function onScanSuccess(scanResult) {
     return;
   }
 
-  scanMissCount = 0;
 
   const suspicious = isSuspiciousScan_(jan, pointInfo, stablePoints, guidePriority);
 
