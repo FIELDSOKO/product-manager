@@ -33,19 +33,15 @@ body.scanner-open .modalBack:not(.show) {
   margin: 0 auto;
 }
 
-.title {
-  text-align: center;
-  font-size: 24px;
-  font-weight: 900;
-  margin: 8px 0 2px;
+.appLogo {
+  width: 95%;
+  max-width: 420px;
+  height: auto;
+  display: block;
+  margin: 8px auto 10px;
+  image-rendering: auto;
 }
 
-.sub {
-  text-align: center;
-  color: #6b7280;
-  font-size: 13px;
-  margin-bottom: 4px;
-}
 
 .updatedAt {
   text-align: center;
