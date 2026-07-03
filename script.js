@@ -1,5 +1,5 @@
 const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzN6ULmcDYUWLTmft67k_Wrra1WazV_aHroJPE63kQnFyLo9LW4_8Rb43qo9hxyTn9krw/exec";
-const APP_VERSION = "2026.07.02.11";
+const APP_VERSION = "2026.07.02.13";
 
 let selectedItem = null;
 let codeReader = null;
@@ -16,6 +16,12 @@ const SUSPICIOUS_CONFIRM_COUNT = 3;
 const GUIDE_ROI_X_MARGIN_RATIO = 0.12;
 const GUIDE_ROI_Y_MARGIN_RATIO = 0.34;
 const GUIDE_ROI_SOFT_MARGIN_RATIO = 0.08;
+const CAMERA_IDEAL_WIDTH_PRIMARY = 1920;
+const CAMERA_IDEAL_HEIGHT_PRIMARY = 1080;
+const CAMERA_IDEAL_WIDTH_FALLBACK = 1280;
+const CAMERA_IDEAL_HEIGHT_FALLBACK = 720;
+const CAMERA_IDEAL_FPS_PRIMARY = 60;
+const CAMERA_IDEAL_FPS_FALLBACK = 30;
 
 let currentStream = null;
 let currentVideoTrack = null;
@@ -486,6 +492,115 @@ async function getPreferredVideoDeviceId_() {
   }
 }
 
+function getCameraConstraints_(deviceId, width, height, fps) {
+  const video = {
+    facingMode: { ideal: "environment" }
+  };
+
+  if (width && height) {
+    video.width = { ideal: width };
+    video.height = { ideal: height };
+  }
+
+  if (fps) {
+    video.frameRate = { ideal: fps };
+  }
+
+  if (deviceId) {
+    video.deviceId = { ideal: deviceId };
+  }
+
+  return {
+    audio: false,
+    video: video
+  };
+}
+
+function startDecodeWithConstraints_(constraints, video, tryHarder) {
+  return new Promise(function(resolve, reject) {
+    if (!codeReader || typeof codeReader.decodeFromConstraints !== "function") {
+      reject(new Error("decodeFromConstraints is not available."));
+      return;
+    }
+
+    decodeStartAt = Date.now();
+
+    codeReader.decodeFromConstraints(constraints, video, function(result, err) {
+      handleDecodeResult_(result, err, video);
+    }).then(resolve).catch(reject);
+  });
+}
+
+function startDecodeWithBrowserDefault_(deviceId, video, tryHarder, allowNullRetry) {
+  if (!codeReader) codeReader = createCodeReader_(tryHarder);
+  decodeStartAt = Date.now();
+
+  codeReader.decodeFromVideoDevice(deviceId || null, video, function(result, err) {
+    handleDecodeResult_(result, err, video);
+  }).catch(function(err) {
+    if (!scannerRunning) return;
+
+    if (allowNullRetry && deviceId) {
+      try {
+        if (codeReader) codeReader.reset();
+      } catch (e) {}
+
+      codeReader = createCodeReader_(tryHarder);
+      startDecodeWithBrowserDefault_(null, video, tryHarder, false);
+      return;
+    }
+
+    stopScanner().then(function() {
+      closeScannerView_();
+      showMessage("error", "JAN読取の開始に失敗しました。\n\n原因：" + (err && err.message ? err.message : String(err)));
+    });
+  });
+}
+
+function startStagedCameraDecode_(deviceId, video, tryHarder, allowNullRetry) {
+  if (!codeReader) codeReader = createCodeReader_(tryHarder);
+
+  if (typeof codeReader.decodeFromConstraints !== "function") {
+    startDecodeWithBrowserDefault_(deviceId, video, tryHarder, allowNullRetry);
+    return;
+  }
+
+  const primaryConstraints = getCameraConstraints_(
+    deviceId,
+    CAMERA_IDEAL_WIDTH_PRIMARY,
+    CAMERA_IDEAL_HEIGHT_PRIMARY,
+    CAMERA_IDEAL_FPS_PRIMARY
+  );
+
+  const secondaryConstraints = getCameraConstraints_(
+    deviceId,
+    CAMERA_IDEAL_WIDTH_FALLBACK,
+    CAMERA_IDEAL_HEIGHT_FALLBACK,
+    CAMERA_IDEAL_FPS_FALLBACK
+  );
+
+  startDecodeWithConstraints_(primaryConstraints, video, tryHarder).catch(function() {
+    if (!scannerRunning) return;
+
+    try {
+      if (codeReader) codeReader.reset();
+    } catch (e) {}
+
+    codeReader = createCodeReader_(tryHarder);
+
+    startDecodeWithConstraints_(secondaryConstraints, video, tryHarder).catch(function() {
+      if (!scannerRunning) return;
+
+      try {
+        if (codeReader) codeReader.reset();
+      } catch (e) {}
+
+      codeReader = createCodeReader_(tryHarder);
+      startDecodeWithBrowserDefault_(deviceId, video, tryHarder, allowNullRetry);
+    });
+  });
+}
+
 function createCodeReader_(tryHarder) {
   const hints = new Map();
   hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.EAN_13]);
@@ -515,29 +630,7 @@ function handleDecodeResult_(result, err, video) {
 }
 
 function startDecodeFromVideoDevice_(deviceId, video, tryHarder, allowNullRetry) {
-  if (!codeReader) codeReader = createCodeReader_(tryHarder);
-  decodeStartAt = Date.now();
-
-  codeReader.decodeFromVideoDevice(deviceId || null, video, function(result, err) {
-    handleDecodeResult_(result, err, video);
-  }).catch(function(err) {
-    if (!scannerRunning) return;
-
-    if (allowNullRetry && deviceId) {
-      try {
-        if (codeReader) codeReader.reset();
-      } catch (e) {}
-
-      codeReader = createCodeReader_(tryHarder);
-      startDecodeFromVideoDevice_(null, video, tryHarder, false);
-      return;
-    }
-
-    stopScanner().then(function() {
-      closeScannerView_();
-      showMessage("error", "JAN読取の開始に失敗しました。\n\n原因：" + (err && err.message ? err.message : String(err)));
-    });
-  });
+  startStagedCameraDecode_(deviceId, video, tryHarder, allowNullRetry);
 }
 
 function sleep_(ms) {
