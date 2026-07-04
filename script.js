@@ -38,6 +38,9 @@ const SEARCH_LIMIT = 20;
 function initApp_() {
   setAppVersion();
   checkAppVersionUpdate_();
+  if (window.__APP_LOADING && window.__APP_LOADING.startMasterTimeout) {
+    window.__APP_LOADING.startMasterTimeout();
+  }
   loadMasterUpdatedAt();
 }
 
@@ -142,12 +145,20 @@ function loadMasterUpdatedAt() {
       document.getElementById("updatedAt").textContent =
         "商品マスタ更新日時：" + (value || "未取得");
       setLoading(false);
+      notifyBootMasterUpdatedAtDone_();
     })
     .catch(function() {
       document.getElementById("updatedAt").textContent =
         "商品マスタ更新日時：取得失敗";
       setLoading(false);
+      notifyBootMasterUpdatedAtDone_();
     });
+}
+
+function notifyBootMasterUpdatedAtDone_() {
+  if (window.__APP_LOADING && window.__APP_LOADING.finishMaster) {
+    window.__APP_LOADING.finishMaster();
+  }
 }
 
 function setLoading(v) {
