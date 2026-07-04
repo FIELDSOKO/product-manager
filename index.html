@@ -246,6 +246,42 @@
       0%, 100% { opacity: 0.55; }
       50% { opacity: 1; }
     }
+
+    #searchLoadingScreen {
+      position: fixed;
+      inset: 0;
+      z-index: 5000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.88);
+      color: #ffffff;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity 0.15s ease, visibility 0.15s ease;
+    }
+
+    #searchLoadingScreen.show {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+
+    #searchLoadingScreen .bootLoadingInner {
+      width: min(66vw, 260px);
+    }
+
+    #searchLoadingScreen .bootLogoWrap {
+      width: min(42vw, 170px);
+      height: min(42vw, 170px);
+      margin-bottom: 18px;
+    }
+
+    #searchLoadingScreen .bootLoadingText {
+      font-size: 16px;
+    }
+
   </style>
   <script src="https://unpkg.com/@zxing/library@latest"></script>
   <script>
@@ -552,6 +588,50 @@
         <span></span><span></span><span></span><span></span><span></span>
         <span></span><span></span><span></span><span></span><span></span>
       </div>
+    </div>
+  </div>
+
+
+  <div id="searchLoadingScreen" role="status" aria-live="polite" aria-hidden="true">
+    <div class="bootLoadingInner">
+      <div class="bootLogoWrap" aria-hidden="true">
+        <div class="bootLogoRingLayer">
+          <img class="bootLogoRingGlow" src="ring.png" alt="">
+          <img class="bootLogoRing" src="ring.png" alt="">
+          <div class="bootLogoSparkLayer">
+            <span class="bootLogoSpark"></span>
+            <span class="bootLogoSpark"></span>
+            <span class="bootLogoSpark"></span>
+            <span class="bootLogoSpark"></span>
+            <span class="bootLogoSpark"></span>
+            <span class="bootLogoSpark"></span>
+            <span class="bootLogoSpark"></span>
+            <span class="bootLogoSpark"></span>
+            <span class="bootLogoSpark"></span>
+            <span class="bootLogoSpark"></span>
+            <span class="bootLogoSpark"></span>
+            <span class="bootLogoSpark"></span>
+            <span class="bootLogoSpark"></span>
+            <span class="bootLogoSpark"></span>
+            <span class="bootLogoSpark"></span>
+            <span class="bootLogoSpark"></span>
+            <span class="bootLogoSpark"></span>
+            <span class="bootLogoSpark"></span>
+            <span class="bootLogoSpark"></span>
+            <span class="bootLogoSpark"></span>
+            <span class="bootLogoSpark"></span>
+            <span class="bootLogoSpark"></span>
+            <span class="bootLogoSpark"></span>
+            <span class="bootLogoSpark"></span>
+            <span class="bootLogoSpark"></span>
+            <span class="bootLogoSpark"></span>
+            <span class="bootLogoSpark"></span>
+            <span class="bootLogoSpark"></span>
+          </div>
+        </div>
+        <img class="bootLogoCenter" src="center.png" alt="">
+      </div>
+      <div class="bootLoadingText">Loading...</div>
     </div>
   </div>
 

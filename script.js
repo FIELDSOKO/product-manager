@@ -161,8 +161,34 @@ function notifyBootMasterUpdatedAtDone_() {
   }
 }
 
+
+function setSearchLoadingVisible_(v) {
+  const el = document.getElementById("searchLoadingScreen");
+  if (!el) return;
+  el.classList.toggle("show", !!v);
+  el.setAttribute("aria-hidden", v ? "false" : "true");
+}
+
+function beginSearchLoading_() {
+  document.body.classList.add("search-loading-context");
+  setLoading(true);
+}
+
+function endSearchLoading_() {
+  setLoading(false);
+  document.body.classList.remove("search-loading-context");
+  setSearchLoadingVisible_(false);
+}
+
 function setLoading(v) {
-  document.getElementById("app").classList.toggle("loading", v);
+  const app = document.getElementById("app");
+  if (app) app.classList.toggle("loading", v);
+
+  if (document.body && document.body.classList.contains("search-loading-context")) {
+    setSearchLoadingVisible_(v);
+  } else if (!v) {
+    setSearchLoadingVisible_(false);
+  }
 }
 
 function showMessage(type, text) {
@@ -205,11 +231,11 @@ function runSearchPage(append) {
     limit: SEARCH_LIMIT
   });
 
-  setLoading(true);
+  beginSearchLoading_();
 
   callGas("search", payload)
     .then(function(res) {
-      setLoading(false);
+      endSearchLoading_();
 
       if (!res || !res.ok) {
         showMessage("error", res && res.message ? res.message : "検索に失敗しました。");
@@ -237,7 +263,7 @@ function runSearchPage(append) {
       currentOffset = shown;
     })
     .catch(function(err) {
-      setLoading(false);
+      endSearchLoading_();
       showMessage("error", err && err.message ? err.message : String(err));
     });
 }

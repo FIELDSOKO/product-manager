@@ -371,4 +371,3 @@ button {
   body.scanner-open { padding: 0; }
   .scannerControls { bottom: calc(82px + env(safe-area-inset-bottom)); }
 }
- 
