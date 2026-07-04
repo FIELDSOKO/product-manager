@@ -364,6 +364,12 @@ button {
   pointer-events: none;
 }
 
+
+#backToResultListBtn {
+  margin-top: 0;
+  margin-bottom: 14px;
+}
+
 @media (max-width: 420px) {
   body { padding: 10px; }
   .grid { grid-template-columns: 1fr; gap: 0; }

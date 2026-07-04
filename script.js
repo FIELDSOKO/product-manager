@@ -34,6 +34,8 @@ let pinchStartZoom = 1;
 let currentSearchPayload = null;
 let currentOffset = 0;
 const SEARCH_LIMIT = 20;
+let resultListReturnAvailable = false;
+let resultListReturnScrollY = 0;
 
 function initApp_() {
   setAppVersion();
@@ -298,7 +300,9 @@ function showMultiResults(items, append, res) {
       "<div class=\"small\">現在ロケ：" + escapeHtml(item.location || "未設定") + "</div>";
 
     div.onclick = function() {
-      selectItem(item);
+      resultListReturnAvailable = true;
+      resultListReturnScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+      selectItem(item, true);
       card.classList.add("hidden");
       showMessage("success", "商品を選択しました。");
     };
@@ -323,7 +327,7 @@ function showMultiResults(items, append, res) {
   card.classList.remove("hidden");
 }
 
-function selectItem(item) {
+function selectItem(item, fromResultList) {
   selectedItem = item;
   document.getElementById("vHinban").textContent = item.hinban || "";
   document.getElementById("vName").textContent = item.name || "";
@@ -331,15 +335,36 @@ function selectItem(item) {
   document.getElementById("vColor").textContent = item.color || "";
   document.getElementById("vSize").textContent = item.size || "";
   document.getElementById("vLocation").textContent = item.location || "未設定";
+  const backBtn = document.getElementById("backToResultListBtn");
+  if (backBtn) backBtn.classList.toggle("hidden", !(fromResultList && resultListReturnAvailable));
   document.getElementById("productCard").classList.remove("hidden");
   document.getElementById("multiCard").classList.add("hidden");
   // document.getElementById("newLocationInput").focus();
 }
 
+
+function backToResultList() {
+  if (!resultListReturnAvailable) return;
+
+  document.getElementById("productCard").classList.add("hidden");
+  document.getElementById("multiCard").classList.remove("hidden");
+  const backBtn = document.getElementById("backToResultListBtn");
+  if (backBtn) backBtn.classList.add("hidden");
+  selectedItem = null;
+
+  setTimeout(function() {
+    window.scrollTo(0, resultListReturnScrollY || 0);
+  }, 0);
+}
+
 function hideProduct() {
   selectedItem = null;
+  resultListReturnAvailable = false;
+  resultListReturnScrollY = 0;
   document.getElementById("productCard").classList.add("hidden");
   document.getElementById("multiCard").classList.add("hidden");
+  const backBtn = document.getElementById("backToResultListBtn");
+  if (backBtn) backBtn.classList.add("hidden");
 }
 
 function openConfirm() {
@@ -417,6 +442,8 @@ function finishComplete() {
 
 function clearAll() {
   selectedItem = null;
+  resultListReturnAvailable = false;
+  resultListReturnScrollY = 0;
   document.getElementById("textInput").value = "";
   document.getElementById("janInput").value = "";
   document.getElementById("hinbanInput").value = "";
@@ -427,6 +454,8 @@ function clearAll() {
   document.getElementById("newLocationInput").value = "";
   document.getElementById("productCard").classList.add("hidden");
   document.getElementById("multiCard").classList.add("hidden");
+  const backBtn = document.getElementById("backToResultListBtn");
+  if (backBtn) backBtn.classList.add("hidden");
   document.getElementById("resultList").innerHTML = "";
   lastScanJan = "";
   sameScanCount = 0;
