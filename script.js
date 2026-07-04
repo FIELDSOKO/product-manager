@@ -357,6 +357,22 @@ function backToResultList() {
   }, 0);
 }
 
+function goTopHome() {
+  clearAll();
+
+  const confirmModal = document.getElementById("confirmModal");
+  if (confirmModal) confirmModal.classList.remove("show");
+
+  const completeModal = document.getElementById("completeModal");
+  if (completeModal) completeModal.classList.remove("show");
+
+  setTimeout(function() {
+    window.scrollTo(0, 0);
+    const textInput = document.getElementById("textInput");
+    if (textInput) textInput.focus();
+  }, 0);
+}
+
 function hideProduct() {
   selectedItem = null;
   resultListReturnAvailable = false;

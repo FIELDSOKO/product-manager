@@ -365,9 +365,21 @@ button {
 }
 
 
-#backToResultListBtn {
+#backToResultListBtn,
+#topFromProductBtn,
+#topFromResultListBtn {
   margin-top: 0;
   margin-bottom: 14px;
+}
+
+.detailNavRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.detailNavRow .wide {
+  width: 100%;
 }
 
 @media (max-width: 420px) {

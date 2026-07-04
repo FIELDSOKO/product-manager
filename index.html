@@ -685,7 +685,10 @@
     </div>
 
     <div class="card hidden" id="productCard">
-      <button id="backToResultListBtn" class="secondary wide hidden" onclick="backToResultList()">← 一覧に戻る</button>
+      <div class="detailNavRow">
+        <button id="backToResultListBtn" class="secondary wide hidden" onclick="backToResultList()">← 一覧に戻る</button>
+        <button id="topFromProductBtn" class="secondary wide" onclick="goTopHome()">🏠 トップへ戻る</button>
+      </div>
       <div class="info">
         <div class="key">品番</div><div class="value" id="vHinban"></div>
         <div class="key">品名</div><div class="value" id="vName"></div>
@@ -708,6 +711,7 @@
     </div>
 
     <div class="card hidden" id="multiCard">
+      <button id="topFromResultListBtn" class="secondary wide" onclick="goTopHome()">🏠 トップへ戻る</button>
       <div style="font-weight:900;">検索結果</div>
       <div class="small">複数見つかりました。変更したい商品を選んでください。</div>
       <div id="resultList"></div>
