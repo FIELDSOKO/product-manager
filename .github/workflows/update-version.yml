@@ -1,0 +1,43 @@
+name: Update version.json
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'version.json'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-version:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Update version.json
+        run: |
+          VERSION=$(TZ='Asia/Tokyo' date '+%Y.%m.%d.%H%M%S')
+          printf '{\n  "version": "%s"\n}\n' "$VERSION" > version.json
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Commit version.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git diff --quiet -- version.json; then
+            echo "version.json has no changes."
+            exit 0
+          fi
+
+          git add version.json
+          git commit -m "chore: update version.json ${VERSION} [skip actions]"
+          git push
