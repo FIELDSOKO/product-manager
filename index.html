@@ -248,7 +248,8 @@
         master: false,
         hidden: false,
         percent: 0,
-        target: 0
+        target: 0,
+        masterSlowHold: false
       };
       var masterTimer = null;
       var progressTimer = null;
@@ -258,6 +259,7 @@
       var minTimeDone = false;
       var MIN_LOADING_MS = 2900;
       var COMPLETE_HOLD_MS = 800;
+      var MASTER_SLOW_COMPLETE_HOLD_MS = 1700;
 
       function clampPercent(value) {
         value = Number(value || 0);
@@ -335,7 +337,7 @@
               if (screen && screen.parentNode) screen.parentNode.removeChild(screen);
             }, 300);
           }
-        }, COMPLETE_HOLD_MS);
+        }, state.masterSlowHold ? MASTER_SLOW_COMPLETE_HOLD_MS : COMPLETE_HOLD_MS);
       }
 
       function mark(name) {
@@ -353,12 +355,17 @@
       function startMasterTimeout() {
         if (masterTimer) return;
         masterTimer = setTimeout(function() {
+          state.masterSlowHold = true;
           mark("master");
         }, 4500);
       }
 
       function finishMaster() {
         if (masterTimer) clearTimeout(masterTimer);
+        var updatedAtEl = document.getElementById("updatedAt");
+        if (updatedAtEl && updatedAtEl.textContent.indexOf("取得失敗") !== -1) {
+          state.masterSlowHold = true;
+        }
         mark("master");
       }
 
