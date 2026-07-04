@@ -84,18 +84,20 @@
 
     .bootLogoRing {
       z-index: 2;
-      filter: drop-shadow(0 0 4px rgba(40, 175, 255, 0.28));
+      filter:
+        drop-shadow(0 0 6px rgba(45, 190, 255, 0.46))
+        drop-shadow(0 0 13px rgba(0, 125, 255, 0.24));
     }
 
     .bootLogoRingGlow {
       z-index: 1;
-      opacity: 0.50;
+      opacity: 0.64;
       filter:
-        saturate(1.22)
-        drop-shadow(0 0 8px rgba(18, 155, 255, 0.58))
-        drop-shadow(0 0 18px rgba(0, 125, 255, 0.36))
-        drop-shadow(0 0 32px rgba(0, 80, 255, 0.22))
-        drop-shadow(0 0 48px rgba(0, 65, 210, 0.12));
+        saturate(1.32)
+        drop-shadow(0 0 12px rgba(18, 170, 255, 0.78))
+        drop-shadow(0 0 28px rgba(0, 140, 255, 0.54))
+        drop-shadow(0 0 50px rgba(0, 90, 255, 0.36))
+        drop-shadow(0 0 72px rgba(0, 65, 210, 0.22));
       animation: bootBlueGlowBreath 3.8s ease-in-out infinite;
       pointer-events: none;
     }
@@ -112,33 +114,34 @@
       border-radius: 50%;
       background: rgba(75, 205, 255, 0.92);
       box-shadow:
-        0 0 8px rgba(60, 205, 255, 0.98),
-        0 0 17px rgba(0, 145, 255, 0.68),
-        0 0 29px rgba(0, 90, 255, 0.42);
+        0 0 12px rgba(70, 220, 255, 1),
+        0 0 26px rgba(0, 160, 255, 0.84),
+        0 0 42px rgba(0, 95, 255, 0.58);
       opacity: 0;
+      filter: brightness(var(--spark-bright, 1));
       transform: translate(-50%, -50%) scale(0.42);
       animation: bootBlueSpark 5.6s ease-in-out infinite;
       will-change: opacity, transform;
     }
 
-    .bootLogoSpark:nth-child(1) { left: 73%; top: 19%; animation-delay: 0.15s; animation-duration: 5.4s; }
-    .bootLogoSpark:nth-child(2) { left: 84%; top: 49%; animation-delay: 1.55s; animation-duration: 6.1s; width: 5px; height: 5px; }
-    .bootLogoSpark:nth-child(3) { left: 61%; top: 82%; animation-delay: 2.65s; animation-duration: 5.8s; width: 7px; height: 7px; }
-    .bootLogoSpark:nth-child(4) { left: 28%; top: 75%; animation-delay: 3.45s; animation-duration: 6.4s; width: 5px; height: 5px; }
-    .bootLogoSpark:nth-child(5) { left: 18%; top: 39%; animation-delay: 4.05s; animation-duration: 5.2s; width: 6px; height: 6px; }
-    .bootLogoSpark:nth-child(6) { left: 47%; top: 13%; animation-delay: 0.95s; animation-duration: 6.8s; width: 4px; height: 4px; }
-    .bootLogoSpark:nth-child(7) { left: 79%; top: 31%; animation-delay: 2.15s; animation-duration: 5.7s; width: 6px; height: 6px; }
-    .bootLogoSpark:nth-child(8) { left: 80%; top: 67%; animation-delay: 3.05s; animation-duration: 6.6s; width: 5px; height: 5px; }
-    .bootLogoSpark:nth-child(9) { left: 48%; top: 88%; animation-delay: 1.05s; animation-duration: 5.9s; width: 4px; height: 4px; }
-    .bootLogoSpark:nth-child(10) { left: 20%; top: 61%; animation-delay: 2.85s; animation-duration: 6.9s; width: 7px; height: 7px; }
-    .bootLogoSpark:nth-child(11) { left: 23%; top: 24%; animation-delay: 4.75s; animation-duration: 5.5s; width: 5px; height: 5px; }
-    .bootLogoSpark:nth-child(12) { left: 58%; top: 15%; animation-delay: 3.75s; animation-duration: 6.3s; width: 6px; height: 6px; }
-    .bootLogoSpark:nth-child(13) { left: 87%; top: 42%; animation-delay: 5.25s; animation-duration: 6.0s; width: 4px; height: 4px; }
-    .bootLogoSpark:nth-child(14) { left: 70%; top: 77%; animation-delay: 0.65s; animation-duration: 7.1s; width: 5px; height: 5px; }
-    .bootLogoSpark:nth-child(15) { left: 36%; top: 84%; animation-delay: 5.85s; animation-duration: 5.6s; width: 6px; height: 6px; }
-    .bootLogoSpark:nth-child(16) { left: 14%; top: 49%; animation-delay: 1.85s; animation-duration: 6.7s; width: 4px; height: 4px; }
-    .bootLogoSpark:nth-child(17) { left: 34%; top: 17%; animation-delay: 6.15s; animation-duration: 6.2s; width: 5px; height: 5px; }
-    .bootLogoSpark:nth-child(18) { left: 89%; top: 58%; animation-delay: 4.45s; animation-duration: 7.3s; width: 5px; height: 5px; }
+    .bootLogoSpark:nth-child(1) { left: 73%; top: 19%; animation-delay: 0.15s; animation-duration: 5.4s; --spark-x1: 2px; --spark-y1: -3px; --spark-x2: -1px; --spark-y2: 2px; --spark-bright: 1.08; --spark-peak: 0.92; }
+    .bootLogoSpark:nth-child(2) { left: 84%; top: 49%; animation-delay: 1.55s; animation-duration: 6.1s; width: 5px; height: 5px; --spark-x1: -2px; --spark-y1: 1px; --spark-x2: 2px; --spark-y2: -1px; --spark-bright: 0.96; --spark-peak: 0.78; }
+    .bootLogoSpark:nth-child(3) { left: 61%; top: 82%; animation-delay: 2.65s; animation-duration: 5.8s; width: 7px; height: 7px; --spark-x1: 1px; --spark-y1: 3px; --spark-x2: -2px; --spark-y2: -2px; --spark-bright: 1.04; --spark-peak: 0.88; }
+    .bootLogoSpark:nth-child(4) { left: 28%; top: 75%; animation-delay: 3.45s; animation-duration: 6.4s; width: 5px; height: 5px; --spark-x1: 2px; --spark-y1: 2px; --spark-x2: -1px; --spark-y2: -3px; --spark-bright: 0.92; --spark-peak: 0.72; }
+    .bootLogoSpark:nth-child(5) { left: 18%; top: 39%; animation-delay: 4.05s; animation-duration: 5.2s; width: 6px; height: 6px; --spark-x1: -3px; --spark-y1: -1px; --spark-x2: 1px; --spark-y2: 2px; --spark-bright: 1.02; --spark-peak: 0.86; }
+    .bootLogoSpark:nth-child(6) { left: 47%; top: 13%; animation-delay: 0.95s; animation-duration: 6.8s; width: 4px; height: 4px; --spark-x1: 1px; --spark-y1: -2px; --spark-x2: -2px; --spark-y2: 1px; --spark-bright: 0.88; --spark-peak: 0.68; }
+    .bootLogoSpark:nth-child(7) { left: 79%; top: 31%; animation-delay: 2.15s; animation-duration: 5.7s; width: 6px; height: 6px; --spark-x1: -1px; --spark-y1: -3px; --spark-x2: 2px; --spark-y2: 2px; --spark-bright: 1.10; --spark-peak: 0.94; }
+    .bootLogoSpark:nth-child(8) { left: 80%; top: 67%; animation-delay: 3.05s; animation-duration: 6.6s; width: 5px; height: 5px; --spark-x1: 3px; --spark-y1: 1px; --spark-x2: -2px; --spark-y2: -1px; --spark-bright: 0.98; --spark-peak: 0.80; }
+    .bootLogoSpark:nth-child(9) { left: 48%; top: 88%; animation-delay: 1.05s; animation-duration: 5.9s; width: 4px; height: 4px; --spark-x1: -1px; --spark-y1: 2px; --spark-x2: 2px; --spark-y2: -2px; --spark-bright: 0.90; --spark-peak: 0.66; }
+    .bootLogoSpark:nth-child(10) { left: 20%; top: 61%; animation-delay: 2.85s; animation-duration: 6.9s; width: 7px; height: 7px; --spark-x1: 2px; --spark-y1: -2px; --spark-x2: -3px; --spark-y2: 2px; --spark-bright: 1.06; --spark-peak: 0.90; }
+    .bootLogoSpark:nth-child(11) { left: 23%; top: 24%; animation-delay: 4.75s; animation-duration: 5.5s; width: 5px; height: 5px; --spark-x1: -2px; --spark-y1: -2px; --spark-x2: 1px; --spark-y2: 3px; --spark-bright: 0.94; --spark-peak: 0.76; }
+    .bootLogoSpark:nth-child(12) { left: 58%; top: 15%; animation-delay: 3.75s; animation-duration: 6.3s; width: 6px; height: 6px; --spark-x1: 2px; --spark-y1: 1px; --spark-x2: -1px; --spark-y2: -2px; --spark-bright: 1.00; --spark-peak: 0.82; }
+    .bootLogoSpark:nth-child(13) { left: 87%; top: 42%; animation-delay: 5.25s; animation-duration: 6.0s; width: 4px; height: 4px; --spark-x1: -1px; --spark-y1: 2px; --spark-x2: 2px; --spark-y2: 1px; --spark-bright: 0.86; --spark-peak: 0.64; }
+    .bootLogoSpark:nth-child(14) { left: 70%; top: 77%; animation-delay: 0.65s; animation-duration: 7.1s; width: 5px; height: 5px; --spark-x1: 3px; --spark-y1: -1px; --spark-x2: -2px; --spark-y2: 2px; --spark-bright: 1.02; --spark-peak: 0.84; }
+    .bootLogoSpark:nth-child(15) { left: 36%; top: 84%; animation-delay: 5.85s; animation-duration: 5.6s; width: 6px; height: 6px; --spark-x1: -2px; --spark-y1: 3px; --spark-x2: 1px; --spark-y2: -2px; --spark-bright: 1.08; --spark-peak: 0.92; }
+    .bootLogoSpark:nth-child(16) { left: 14%; top: 49%; animation-delay: 1.85s; animation-duration: 6.7s; width: 4px; height: 4px; --spark-x1: 1px; --spark-y1: -2px; --spark-x2: -2px; --spark-y2: 1px; --spark-bright: 0.88; --spark-peak: 0.68; }
+    .bootLogoSpark:nth-child(17) { left: 34%; top: 17%; animation-delay: 6.15s; animation-duration: 6.2s; width: 5px; height: 5px; --spark-x1: -3px; --spark-y1: 1px; --spark-x2: 2px; --spark-y2: -2px; --spark-bright: 0.96; --spark-peak: 0.78; }
+    .bootLogoSpark:nth-child(18) { left: 89%; top: 58%; animation-delay: 4.45s; animation-duration: 7.3s; width: 5px; height: 5px; --spark-x1: 2px; --spark-y1: 2px; --spark-x2: -1px; --spark-y2: -3px; --spark-bright: 1.00; --spark-peak: 0.82; }
 
     .bootLogoCenter {
       z-index: 4;
@@ -188,25 +191,25 @@
 
     @keyframes bootBlueGlowBreath {
       0%, 100% {
-        opacity: 0.34;
+        opacity: 0.48;
         filter:
-          saturate(1.12)
-          drop-shadow(0 0 6px rgba(18, 155, 255, 0.42))
-          drop-shadow(0 0 13px rgba(0, 115, 255, 0.28))
-          drop-shadow(0 0 24px rgba(0, 80, 255, 0.16))
-          drop-shadow(0 0 36px rgba(0, 65, 210, 0.08));
+          saturate(1.18)
+          drop-shadow(0 0 9px rgba(18, 165, 255, 0.58))
+          drop-shadow(0 0 20px rgba(0, 130, 255, 0.42))
+          drop-shadow(0 0 38px rgba(0, 90, 255, 0.28))
+          drop-shadow(0 0 56px rgba(0, 65, 210, 0.16));
       }
       48% {
-        opacity: 0.68;
+        opacity: 0.84;
         filter:
-          saturate(1.26)
-          drop-shadow(0 0 10px rgba(45, 190, 255, 0.72))
-          drop-shadow(0 0 22px rgba(0, 140, 255, 0.44))
-          drop-shadow(0 0 38px rgba(0, 90, 255, 0.27))
-          drop-shadow(0 0 58px rgba(0, 65, 210, 0.14));
+          saturate(1.35)
+          drop-shadow(0 0 15px rgba(55, 205, 255, 0.90))
+          drop-shadow(0 0 33px rgba(0, 155, 255, 0.62))
+          drop-shadow(0 0 56px rgba(0, 100, 255, 0.41))
+          drop-shadow(0 0 82px rgba(0, 70, 220, 0.24));
       }
       72% {
-        opacity: 0.46;
+        opacity: 0.60;
       }
     }
 
@@ -216,16 +219,16 @@
         transform: translate(-50%, -50%) scale(0.45);
       }
       68% {
-        opacity: 0.42;
-        transform: translate(-50%, -50%) scale(0.75);
+        opacity: calc(var(--spark-peak, 0.86) * 0.42);
+        transform: translate(calc(-50% + var(--spark-x1, 1px)), calc(-50% + var(--spark-y1, -1px))) scale(0.78);
       }
       73% {
-        opacity: 1;
-        transform: translate(-50%, -50%) scale(1.08);
+        opacity: var(--spark-peak, 0.86);
+        transform: translate(calc(-50% + var(--spark-x2, -1px)), calc(-50% + var(--spark-y2, 1px))) scale(1.16);
       }
       82% {
-        opacity: 0.18;
-        transform: translate(-50%, -50%) scale(1.35);
+        opacity: calc(var(--spark-peak, 0.86) * 0.24);
+        transform: translate(calc(-50% + var(--spark-x1, 1px)), calc(-50% + var(--spark-y2, 1px))) scale(1.52);
       }
     }
 
@@ -244,9 +247,13 @@
         js: false,
         master: false,
         hidden: false,
-        percent: 0
+        percent: 0,
+        target: 0
       };
       var masterTimer = null;
+      var progressTimer = null;
+      var completeTimer = null;
+      var progressReady = false;
 
       function clampPercent(value) {
         value = Number(value || 0);
@@ -254,8 +261,7 @@
         return Math.max(0, Math.min(100, value));
       }
 
-      function setProgress(value) {
-        state.percent = Math.max(state.percent, clampPercent(value));
+      function renderProgress() {
         var percentEl = document.getElementById("bootProgressPercent");
         var blocks = document.querySelectorAll("#bootProgressBlocks span");
         var onCount = Math.ceil(state.percent / 10);
@@ -266,6 +272,46 @@
         });
       }
 
+      function startProgressAnimation() {
+        if (progressTimer) return;
+        progressTimer = setInterval(function() {
+          if (Math.abs(state.target - state.percent) < 0.5) {
+            state.percent = state.target;
+            renderProgress();
+            if (state.percent >= 100 || state.percent === state.target) {
+              clearInterval(progressTimer);
+              progressTimer = null;
+            }
+            return;
+          }
+
+          var diff = state.target - state.percent;
+          var step = Math.max(0.7, Math.abs(diff) * 0.12);
+          state.percent += diff > 0 ? step : -step;
+
+          if (diff > 0 && state.percent > state.target) state.percent = state.target;
+          if (diff < 0 && state.percent < state.target) state.percent = state.target;
+          renderProgress();
+        }, 32);
+      }
+
+      function setProgress(value, immediate) {
+        var next = clampPercent(value);
+        state.target = Math.max(state.target, next);
+
+        if (immediate) {
+          state.percent = state.target;
+          renderProgress();
+          if (progressTimer) {
+            clearInterval(progressTimer);
+            progressTimer = null;
+          }
+          return;
+        }
+
+        startProgressAnimation();
+      }
+
       function canHide() {
         return state.version && state.css && state.js && state.master;
       }
@@ -273,22 +319,26 @@
       function hideIfReady() {
         if (state.hidden || !canHide()) return;
         state.hidden = true;
-        setProgress(100);
-        document.body.classList.remove("loading-active");
-        var screen = document.getElementById("bootLoadingScreen");
-        if (screen) {
-          screen.classList.add("hide");
-          setTimeout(function() {
-            if (screen && screen.parentNode) screen.parentNode.removeChild(screen);
-          }, 300);
-        }
+        setProgress(100, true);
+
+        if (completeTimer) clearTimeout(completeTimer);
+        completeTimer = setTimeout(function() {
+          document.body.classList.remove("loading-active");
+          var screen = document.getElementById("bootLoadingScreen");
+          if (screen) {
+            screen.classList.add("hide");
+            setTimeout(function() {
+              if (screen && screen.parentNode) screen.parentNode.removeChild(screen);
+            }, 300);
+          }
+        }, 650);
       }
 
       function mark(name) {
         if (!state.hasOwnProperty(name)) return;
         state[name] = true;
 
-        if (name === "version") setProgress(25);
+        if (name === "version") setProgress(20);
         if (name === "css") setProgress(45);
         if (name === "js") setProgress(70);
         if (name === "master") setProgress(95);
@@ -306,6 +356,19 @@
       function finishMaster() {
         if (masterTimer) clearTimeout(masterTimer);
         mark("master");
+      }
+
+      function initProgressDisplay() {
+        if (progressReady) return;
+        progressReady = true;
+        renderProgress();
+        setProgress(5);
+      }
+
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", initProgressDisplay);
+      } else {
+        initProgressDisplay();
       }
 
       return {
