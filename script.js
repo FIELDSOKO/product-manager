@@ -1,5 +1,5 @@
 const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzN6ULmcDYUWLTmft67k_Wrra1WazV_aHroJPE63kQnFyLo9LW4_8Rb43qo9hxyTn9krw/exec";
-const APP_VERSION = "2026.07.02.13";
+const APP_VERSION = window.__APP_VERSION || "2026.07.02.13";
 
 let selectedItem = null;
 let codeReader = null;
@@ -35,14 +35,57 @@ let currentSearchPayload = null;
 let currentOffset = 0;
 const SEARCH_LIMIT = 20;
 
-window.addEventListener("load", function() {
+function initApp_() {
   setAppVersion();
+  checkAppVersionUpdate_();
   loadMasterUpdatedAt();
-});
+}
+
+if (document.readyState === "complete") {
+  initApp_();
+} else {
+  window.addEventListener("load", initApp_);
+}
 
 function setAppVersion() {
   const el = document.getElementById("appVersion");
   if (el) el.textContent = "Ver." + APP_VERSION;
+}
+
+function checkAppVersionUpdate_() {
+  fetch("version.json?ts=" + Date.now(), { cache: "no-store" })
+    .then(function(res) {
+      if (!res.ok) return null;
+      return res.json();
+    })
+    .then(function(data) {
+      const latestVersion = data && data.version ? String(data.version) : "";
+      if (latestVersion && latestVersion !== String(APP_VERSION)) {
+        forceReloadWithLatestVersion_(latestVersion);
+      }
+    })
+    .catch(function() {});
+}
+
+function forceReloadWithLatestVersion_(latestVersion) {
+  try {
+    var safeLatestVersion = String(latestVersion || "").replace(/[^0-9A-Za-z._-]/g, "");
+    if (!safeLatestVersion) {
+      window.location.reload();
+      return;
+    }
+
+    try {
+      localStorage.setItem("stockAppLatestVersion", safeLatestVersion);
+    } catch (e) {}
+
+    var url = new URL(window.location.href);
+    url.searchParams.set("appVersion", safeLatestVersion);
+    url.searchParams.set("cacheBust", Date.now());
+    window.location.replace(url.toString());
+  } catch (e) {
+    window.location.reload();
+  }
 }
 
 function callGas(action, params) {

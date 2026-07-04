@@ -8,11 +8,50 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="在庫管理">
   <meta name="theme-color" content="#2563eb">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icon-180.png">
   <link rel="icon" type="image/png" href="icon-192.png">
   <script src="https://unpkg.com/@zxing/library@latest"></script>
-  <link rel="stylesheet" href="style.css">
+  <script>
+    (function() {
+      var fallbackVersion = "2026.07.02.13";
+
+      function safeVersion(value) {
+        return String(value || fallbackVersion).replace(/[^0-9A-Za-z._-]/g, "");
+      }
+
+      function loadAppAssets(version) {
+        var v = safeVersion(version);
+        window.__APP_VERSION = v;
+
+        var css = document.createElement("link");
+        css.rel = "stylesheet";
+        css.href = "style.css?v=" + encodeURIComponent(v);
+        document.head.appendChild(css);
+
+        var js = document.createElement("script");
+        js.async = false;
+        js.src = "script.js?v=" + encodeURIComponent(v);
+        js.defer = true;
+        document.head.appendChild(js);
+      }
+
+      fetch("version.json?ts=" + Date.now(), { cache: "no-store" })
+        .then(function(res) {
+          if (!res.ok) throw new Error("version.json load error");
+          return res.json();
+        })
+        .then(function(data) {
+          loadAppAssets(data && data.version);
+        })
+        .catch(function() {
+          loadAppAssets(fallbackVersion);
+        });
+    })();
+  </script>
 </head>
 
 <body>
@@ -166,6 +205,5 @@
     </div>
   </div>
 
-  <script src="script.js"></script>
 </body>
 </html>
