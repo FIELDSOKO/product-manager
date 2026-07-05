@@ -59,6 +59,170 @@
       margin: 0 auto 22px;
     }
 
+    #bootLoadingScreen .bootLogoWrap {
+      overflow: visible;
+    }
+
+    #bootLoadingScreen .bootMeteorLayer,
+    #bootLoadingScreen .bootOuterParticleLayer {
+      position: absolute;
+      inset: -15%;
+      width: 130%;
+      height: 130%;
+      pointer-events: none;
+    }
+
+    #bootLoadingScreen .bootMeteorLayer {
+      z-index: 0;
+      animation: bootMeteorOrbit 6.8s linear infinite;
+      will-change: transform;
+    }
+
+    #bootLoadingScreen .bootMeteorLayer.meteorTwo {
+      animation-duration: 7.6s;
+      transform: rotate(180deg);
+    }
+
+    #bootLoadingScreen .bootMeteorLayer.meteorThree {
+      animation: bootMeteorOrbitRandom 12.8s linear infinite;
+      opacity: 0;
+    }
+
+    #bootLoadingScreen .bootMeteor {
+      position: absolute;
+      left: 50%;
+      top: 0;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: rgba(0, 190, 255, 0.98);
+      box-shadow:
+        0 0 10px rgba(0, 190, 255, 1),
+        0 0 22px rgba(0, 190, 255, 0.88),
+        0 0 42px rgba(0, 190, 255, 0.58);
+      transform: translate(-50%, -50%);
+    }
+
+    #bootLoadingScreen .bootMeteorLayer.meteorTwo .bootMeteor {
+      width: 7px;
+      height: 7px;
+      background: rgba(0, 190, 255, 0.90);
+      box-shadow:
+        0 0 9px rgba(0, 190, 255, 0.92),
+        0 0 19px rgba(0, 190, 255, 0.72),
+        0 0 36px rgba(0, 190, 255, 0.44);
+    }
+
+    #bootLoadingScreen .bootMeteorLayer.meteorThree .bootMeteor {
+      width: 6px;
+      height: 6px;
+      background: rgba(0, 190, 255, 0.94);
+      box-shadow:
+        0 0 9px rgba(0, 190, 255, 0.96),
+        0 0 21px rgba(0, 190, 255, 0.78),
+        0 0 39px rgba(0, 190, 255, 0.48);
+    }
+
+    #bootLoadingScreen .bootMeteor::before {
+      content: "";
+      position: absolute;
+      right: 5px;
+      top: 50%;
+      width: 72px;
+      height: 3px;
+      border-radius: 999px;
+      background: linear-gradient(
+        90deg,
+        rgba(0, 190, 255, 0),
+        rgba(0, 190, 255, 0.18),
+        rgba(0, 190, 255, 0.58),
+        rgba(0, 190, 255, 0.92)
+      );
+      filter: blur(1px);
+      transform: translateY(-50%);
+    }
+
+    #bootLoadingScreen .bootMeteorLayer.meteorTwo .bootMeteor::before {
+      width: 58px;
+      height: 2px;
+      background: linear-gradient(
+        90deg,
+        rgba(0, 190, 255, 0),
+        rgba(0, 190, 255, 0.15),
+        rgba(0, 190, 255, 0.46),
+        rgba(0, 190, 255, 0.78)
+      );
+    }
+
+    #bootLoadingScreen .bootMeteorLayer.meteorThree .bootMeteor::before {
+      width: 64px;
+      height: 2px;
+      background: linear-gradient(
+        90deg,
+        rgba(0, 190, 255, 0),
+        rgba(0, 190, 255, 0.14),
+        rgba(0, 190, 255, 0.42),
+        rgba(0, 190, 255, 0.82)
+      );
+    }
+
+    #bootLoadingScreen .bootMeteor::after {
+      content: "";
+      position: absolute;
+      right: 1px;
+      top: 50%;
+      width: 44px;
+      height: 1px;
+      border-radius: 999px;
+      background: linear-gradient(
+        90deg,
+        rgba(0, 190, 255, 0),
+        rgba(0, 190, 255, 0.40),
+        rgba(0, 190, 255, 0.96)
+      );
+      transform: translateY(-50%);
+    }
+
+    #bootLoadingScreen .bootMeteorLayer.meteorTwo .bootMeteor::after {
+      width: 34px;
+      background: linear-gradient(
+        90deg,
+        rgba(0, 190, 255, 0),
+        rgba(0, 190, 255, 0.30),
+        rgba(0, 190, 255, 0.78)
+      );
+    }
+
+    #bootLoadingScreen .bootMeteorLayer.meteorThree .bootMeteor::after {
+      width: 38px;
+      background: linear-gradient(
+        90deg,
+        rgba(0, 190, 255, 0),
+        rgba(0, 190, 255, 0.34),
+        rgba(0, 190, 255, 0.86)
+      );
+    }
+
+    #bootLoadingScreen .bootOuterParticleLayer {
+      z-index: 5;
+    }
+
+    #bootLoadingScreen .bootOuterParticle {
+      position: absolute;
+      width: var(--particle-size, 3px);
+      height: var(--particle-size, 3px);
+      border-radius: 50%;
+      background: rgba(0, 190, 255, 0.88);
+      box-shadow:
+        0 0 7px rgba(0, 190, 255, 0.82),
+        0 0 15px rgba(0, 190, 255, 0.42);
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(0.55);
+      animation: bootOuterParticleTwinkle var(--particle-duration, 5.8s) ease-in-out infinite;
+      animation-delay: var(--particle-delay, 0s);
+      will-change: opacity, transform;
+    }
+
     .bootLogoRingLayer,
     .bootLogoRingGlow,
     .bootLogoRing,
@@ -85,8 +249,8 @@
     .bootLogoRing {
       z-index: 2;
       filter:
-        drop-shadow(0 0 10px rgba(35, 190, 255, 0.78))
-        drop-shadow(0 0 22px rgba(0, 135, 255, 0.46));
+        drop-shadow(0 0 10px rgba(0, 190, 255, 0.78))
+        drop-shadow(0 0 22px rgba(0, 190, 255, 0.46));
     }
 
     .bootLogoRingGlow {
@@ -94,10 +258,10 @@
       opacity: 0.80;
       filter:
         saturate(1.48)
-        drop-shadow(0 0 21px rgba(18, 175, 255, 0.96))
-        drop-shadow(0 0 48px rgba(0, 145, 255, 0.74))
-        drop-shadow(0 0 92px rgba(0, 95, 255, 0.52))
-        drop-shadow(0 0 132px rgba(0, 70, 220, 0.34));
+        drop-shadow(0 0 21px rgba(0, 190, 255, 0.96))
+        drop-shadow(0 0 48px rgba(0, 190, 255, 0.74))
+        drop-shadow(0 0 92px rgba(0, 190, 255, 0.52))
+        drop-shadow(0 0 132px rgba(0, 190, 255, 0.34));
       animation: bootBlueGlowBreath 3.8s ease-in-out infinite;
       pointer-events: none;
     }
@@ -112,11 +276,11 @@
       width: 7px;
       height: 7px;
       border-radius: 50%;
-      background: rgba(55, 205, 255, 0.96);
+      background: rgba(0, 190, 255, 0.96);
       box-shadow:
-        0 0 18px rgba(45, 215, 255, 1),
-        0 0 42px rgba(0, 160, 255, 0.96),
-        0 0 72px rgba(0, 100, 255, 0.72);
+        0 0 18px rgba(0, 190, 255, 1),
+        0 0 42px rgba(0, 190, 255, 0.96),
+        0 0 72px rgba(0, 190, 255, 0.72);
       opacity: 0;
       filter: brightness(var(--spark-bright, 1));
       transform: translate(-50%, -50%) scale(0.42);
@@ -153,6 +317,39 @@
     .bootLogoSpark:nth-child(27) { left: 31%; top: 11%; animation-delay: 6.95s; animation-duration: 6.9s; width: 4px; height: 4px; --spark-x1: 2px; --spark-y1: 1px; --spark-x2: -2px; --spark-y2: -1px; --spark-bright: 0.90; --spark-peak: 0.66; }
     .bootLogoSpark:nth-child(28) { left: 76%; top: 86%; animation-delay: 4.95s; animation-duration: 5.8s; width: 7px; height: 7px; --spark-x1: -2px; --spark-y1: 3px; --spark-x2: 1px; --spark-y2: -2px; --spark-bright: 1.16; --spark-peak: 0.96; }
 
+    #bootLoadingScreen .bootOuterParticle:nth-child(1) { left: 50%; top: -8%; --particle-delay: 0.2s; --particle-duration: 5.8s; --particle-size: 3px; --particle-peak: 1.0; }
+    #bootLoadingScreen .bootOuterParticle:nth-child(2) { left: 61%; top: -5%; --particle-delay: 1.1s; --particle-duration: 6.3s; --particle-size: 2px; --particle-peak: 0.78; }
+    #bootLoadingScreen .bootOuterParticle:nth-child(3) { left: 73%; top: 3%; --particle-delay: 2.0s; --particle-duration: 5.5s; --particle-size: 4px; --particle-peak: 0.9; }
+    #bootLoadingScreen .bootOuterParticle:nth-child(4) { left: 86%; top: 16%; --particle-delay: 3.2s; --particle-duration: 6.8s; --particle-size: 3px; --particle-peak: 0.72; }
+    #bootLoadingScreen .bootOuterParticle:nth-child(5) { left: 97%; top: 32%; --particle-delay: 4.0s; --particle-duration: 5.9s; --particle-size: 2px; --particle-peak: 0.68; }
+    #bootLoadingScreen .bootOuterParticle:nth-child(6) { left: 105%; top: 50%; --particle-delay: 0.8s; --particle-duration: 6.4s; --particle-size: 3px; --particle-peak: 0.84; }
+    #bootLoadingScreen .bootOuterParticle:nth-child(7) { left: 98%; top: 68%; --particle-delay: 2.6s; --particle-duration: 5.7s; --particle-size: 4px; --particle-peak: 0.88; }
+    #bootLoadingScreen .bootOuterParticle:nth-child(8) { left: 87%; top: 84%; --particle-delay: 5.0s; --particle-duration: 6.6s; --particle-size: 2px; --particle-peak: 0.7; }
+    #bootLoadingScreen .bootOuterParticle:nth-child(9) { left: 72%; top: 96%; --particle-delay: 1.7s; --particle-duration: 5.4s; --particle-size: 3px; --particle-peak: 0.78; }
+    #bootLoadingScreen .bootOuterParticle:nth-child(10) { left: 58%; top: 104%; --particle-delay: 3.9s; --particle-duration: 6.9s; --particle-size: 2px; --particle-peak: 0.66; }
+    #bootLoadingScreen .bootOuterParticle:nth-child(11) { left: 42%; top: 105%; --particle-delay: 0.5s; --particle-duration: 5.8s; --particle-size: 4px; --particle-peak: 0.86; }
+    #bootLoadingScreen .bootOuterParticle:nth-child(12) { left: 28%; top: 97%; --particle-delay: 2.8s; --particle-duration: 6.2s; --particle-size: 3px; --particle-peak: 0.8; }
+    #bootLoadingScreen .bootOuterParticle:nth-child(13) { left: 14%; top: 86%; --particle-delay: 4.8s; --particle-duration: 5.6s; --particle-size: 2px; --particle-peak: 0.68; }
+    #bootLoadingScreen .bootOuterParticle:nth-child(14) { left: 3%; top: 70%; --particle-delay: 1.4s; --particle-duration: 6.7s; --particle-size: 3px; --particle-peak: 0.76; }
+    #bootLoadingScreen .bootOuterParticle:nth-child(15) { left: -5%; top: 53%; --particle-delay: 3.3s; --particle-duration: 5.7s; --particle-size: 4px; --particle-peak: 0.84; }
+    #bootLoadingScreen .bootOuterParticle:nth-child(16) { left: 1%; top: 35%; --particle-delay: 5.3s; --particle-duration: 6.5s; --particle-size: 2px; --particle-peak: 0.7; }
+    #bootLoadingScreen .bootOuterParticle:nth-child(17) { left: 12%; top: 18%; --particle-delay: 0.9s; --particle-duration: 5.9s; --particle-size: 3px; --particle-peak: 0.82; }
+    #bootLoadingScreen .bootOuterParticle:nth-child(18) { left: 28%; top: 4%; --particle-delay: 2.2s; --particle-duration: 6.8s; --particle-size: 2px; --particle-peak: 0.68; }
+    #bootLoadingScreen .bootOuterParticle:nth-child(19) { left: 40%; top: -10%; --particle-delay: 4.4s; --particle-duration: 5.6s; --particle-size: 3px; --particle-peak: 0.74; }
+    #bootLoadingScreen .bootOuterParticle:nth-child(20) { left: 67%; top: -11%; --particle-delay: 5.8s; --particle-duration: 7.0s; --particle-size: 2px; --particle-peak: 0.64; }
+    #bootLoadingScreen .bootOuterParticle:nth-child(21) { left: 92%; top: 8%; --particle-delay: 1.9s; --particle-duration: 6.1s; --particle-size: 3px; --particle-peak: 0.8; }
+    #bootLoadingScreen .bootOuterParticle:nth-child(22) { left: 108%; top: 24%; --particle-delay: 3.8s; --particle-duration: 5.8s; --particle-size: 2px; --particle-peak: 0.7; }
+    #bootLoadingScreen .bootOuterParticle:nth-child(23) { left: 112%; top: 61%; --particle-delay: 0.4s; --particle-duration: 6.6s; --particle-size: 3px; --particle-peak: 0.78; }
+    #bootLoadingScreen .bootOuterParticle:nth-child(24) { left: 102%; top: 80%; --particle-delay: 2.9s; --particle-duration: 5.5s; --particle-size: 4px; --particle-peak: 0.86; }
+    #bootLoadingScreen .bootOuterParticle:nth-child(25) { left: 84%; top: 101%; --particle-delay: 4.9s; --particle-duration: 6.4s; --particle-size: 2px; --particle-peak: 0.66; }
+    #bootLoadingScreen .bootOuterParticle:nth-child(26) { left: 64%; top: 111%; --particle-delay: 1.2s; --particle-duration: 5.9s; --particle-size: 3px; --particle-peak: 0.78; }
+    #bootLoadingScreen .bootOuterParticle:nth-child(27) { left: 35%; top: 109%; --particle-delay: 3.1s; --particle-duration: 6.7s; --particle-size: 2px; --particle-peak: 0.72; }
+    #bootLoadingScreen .bootOuterParticle:nth-child(28) { left: 16%; top: 101%; --particle-delay: 5.5s; --particle-duration: 5.6s; --particle-size: 3px; --particle-peak: 0.8; }
+    #bootLoadingScreen .bootOuterParticle:nth-child(29) { left: -9%; top: 78%; --particle-delay: 2.4s; --particle-duration: 6.2s; --particle-size: 2px; --particle-peak: 0.64; }
+    #bootLoadingScreen .bootOuterParticle:nth-child(30) { left: -12%; top: 44%; --particle-delay: 4.2s; --particle-duration: 6.9s; --particle-size: 3px; --particle-peak: 0.76; }
+    #bootLoadingScreen .bootOuterParticle:nth-child(31) { left: 5%; top: 10%; --particle-delay: 0.1s; --particle-duration: 5.7s; --particle-size: 2px; --particle-peak: 0.68; }
+    #bootLoadingScreen .bootOuterParticle:nth-child(32) { left: 52%; top: 112%; --particle-delay: 5.9s; --particle-duration: 6.3s; --particle-size: 3px; --particle-peak: 0.8; }
+
     .bootLogoCenter {
       z-index: 4;
     }
@@ -162,7 +359,7 @@
       font-size: 18px;
       font-weight: 900;
       letter-spacing: 0.08em;
-      text-shadow: 0 0 10px rgba(120, 210, 255, 0.7);
+      text-shadow: 0 0 10px rgba(0, 190, 255, 0.7);
       animation: bootTextBlink 1.8s ease-in-out infinite;
     }
 
@@ -171,7 +368,7 @@
       color: #ccefff;
       font-size: 14px;
       font-weight: 900;
-      text-shadow: 0 0 8px rgba(60, 170, 255, 0.65);
+      text-shadow: 0 0 8px rgba(0, 190, 255, 0.65);
     }
 
     .bootProgressBlocks {
@@ -186,12 +383,12 @@
       height: 13px;
       border-radius: 3px;
       background: rgba(20, 55, 80, 0.72);
-      box-shadow: inset 0 0 0 1px rgba(80, 170, 230, 0.22);
+      box-shadow: inset 0 0 0 1px rgba(0, 190, 255, 0.22);
     }
 
     .bootProgressBlocks span.on {
-      background: #14b8ff;
-      box-shadow: 0 0 8px rgba(20, 184, 255, 0.95), 0 0 16px rgba(20, 184, 255, 0.52);
+      background: rgb(0, 190, 255);
+      box-shadow: 0 0 8px rgba(0, 190, 255, 0.95), 0 0 16px rgba(0, 190, 255, 0.52);
     }
 
     @keyframes bootRingRotate {
@@ -199,24 +396,75 @@
       to { transform: rotate(360deg); }
     }
 
+    @keyframes bootMeteorOrbit {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    @keyframes bootMeteorOrbitRandom {
+      0%, 46% {
+        opacity: 0;
+        transform: rotate(70deg);
+      }
+      50% {
+        opacity: 0;
+        transform: rotate(70deg);
+      }
+      54% {
+        opacity: 0.86;
+        transform: rotate(132deg);
+      }
+      71% {
+        opacity: 0.86;
+        transform: rotate(852deg);
+      }
+      78% {
+        opacity: 0;
+        transform: rotate(1080deg);
+      }
+      100% {
+        opacity: 0;
+        transform: rotate(1080deg);
+      }
+    }
+
+    @keyframes bootOuterParticleTwinkle {
+      0%, 54%, 100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.55);
+      }
+      61% {
+        opacity: calc(var(--particle-peak, 0.75) * 0.42);
+        transform: translate(-50%, -50%) scale(0.85);
+      }
+      70% {
+        opacity: var(--particle-peak, 0.75);
+        transform: translate(-50%, -50%) scale(1.18);
+      }
+      88% {
+        opacity: calc(var(--particle-peak, 0.75) * 0.18);
+        transform: translate(-50%, -50%) scale(1.55);
+      }
+    }
+
     @keyframes bootBlueGlowBreath {
       0%, 100% {
         opacity: 0.54;
         filter:
           saturate(1.28)
-          drop-shadow(0 0 15px rgba(18, 170, 255, 0.76))
-          drop-shadow(0 0 34px rgba(0, 135, 255, 0.58))
-          drop-shadow(0 0 66px rgba(0, 95, 255, 0.40))
-          drop-shadow(0 0 96px rgba(0, 70, 220, 0.26));
+          drop-shadow(0 0 15px rgba(0, 190, 255, 0.76))
+          drop-shadow(0 0 34px rgba(0, 190, 255, 0.58))
+          drop-shadow(0 0 66px rgba(0, 190, 255, 0.40))
+          drop-shadow(0 0 96px rgba(0, 190, 255, 0.26));
       }
       48% {
         opacity: 0.98;
         filter:
           saturate(1.58)
-          drop-shadow(0 0 26px rgba(55, 210, 255, 1))
-          drop-shadow(0 0 58px rgba(0, 160, 255, 0.86))
-          drop-shadow(0 0 104px rgba(0, 105, 255, 0.62))
-          drop-shadow(0 0 154px rgba(0, 75, 225, 0.38));
+          drop-shadow(0 0 26px rgba(0, 190, 255, 1))
+          drop-shadow(0 0 58px rgba(0, 190, 255, 0.86))
+          drop-shadow(0 0 104px rgba(0, 190, 255, 0.62))
+          drop-shadow(0 0 154px rgba(0, 190, 255, 0.38));
       }
       72% {
         opacity: 0.70;
@@ -282,6 +530,540 @@
       font-size: 16px;
     }
 
+
+    /* 起動時ローディング：ネオンブルー統一・発光強化（既存演出の色味のみ上書き） */
+    #bootLoadingScreen {
+      --boot-neon-core: rgb(0, 190, 255);
+      --boot-neon-main: rgb(0, 190, 255);
+      --boot-neon-deep: rgb(0, 190, 255);
+      --boot-neon-soft: rgba(0, 190, 255, 0.72);
+    }
+
+    #bootLoadingScreen.bootComplete {
+      animation: bootCompleteBluePulse 0.8s ease-out 1;
+    }
+
+    #bootLoadingScreen .bootLogoRing {
+      filter:
+        saturate(1.42)
+        contrast(1.06)
+        drop-shadow(0 0 12px rgba(0, 190, 255, 0.92))
+        drop-shadow(0 0 28px rgba(0, 190, 255, 0.66))
+        drop-shadow(0 0 56px rgba(0, 190, 255, 0.38));
+    }
+
+    #bootLoadingScreen .bootLogoRingGlow {
+      opacity: 0.88;
+      filter:
+        saturate(1.78)
+        contrast(1.08)
+        drop-shadow(0 0 25px rgba(0, 190, 255, 1))
+        drop-shadow(0 0 58px rgba(0, 190, 255, 0.88))
+        drop-shadow(0 0 112px rgba(0, 190, 255, 0.62))
+        drop-shadow(0 0 168px rgba(0, 190, 255, 0.36));
+    }
+
+    #bootLoadingScreen .bootLogoCenter {
+      filter:
+        saturate(1.38)
+        contrast(1.05)
+        drop-shadow(0 0 9px rgba(0, 190, 255, 0.72))
+        drop-shadow(0 0 22px rgba(0, 190, 255, 0.42));
+    }
+
+    #bootLoadingScreen .bootMeteor {
+      background: rgba(0, 190, 255, 0.98);
+      box-shadow:
+        0 0 12px rgba(0, 190, 255, 1),
+        0 0 28px rgba(0, 190, 255, 0.94),
+        0 0 56px rgba(0, 190, 255, 0.64);
+    }
+
+    #bootLoadingScreen .bootMeteorLayer.meteorTwo .bootMeteor {
+      background: rgba(0, 190, 255, 0.92);
+      box-shadow:
+        0 0 11px rgba(0, 190, 255, 0.96),
+        0 0 24px rgba(0, 190, 255, 0.78),
+        0 0 48px rgba(0, 190, 255, 0.50);
+    }
+
+    #bootLoadingScreen .bootMeteorLayer.meteorThree .bootMeteor {
+      background: rgba(0, 190, 255, 0.94);
+      box-shadow:
+        0 0 11px rgba(0, 190, 255, 0.98),
+        0 0 26px rgba(0, 190, 255, 0.82),
+        0 0 52px rgba(0, 190, 255, 0.54);
+    }
+
+    #bootLoadingScreen .bootMeteor::before {
+      width: 86px;
+      background: linear-gradient(
+        90deg,
+        rgba(0, 190, 255, 0),
+        rgba(0, 190, 255, 0.18),
+        rgba(0, 190, 255, 0.62),
+        rgba(0, 190, 255, 0.96)
+      );
+      filter: blur(1.2px);
+    }
+
+    #bootLoadingScreen .bootMeteorLayer.meteorTwo .bootMeteor::before {
+      width: 70px;
+      background: linear-gradient(
+        90deg,
+        rgba(0, 190, 255, 0),
+        rgba(0, 190, 255, 0.16),
+        rgba(0, 190, 255, 0.50),
+        rgba(0, 190, 255, 0.84)
+      );
+    }
+
+    #bootLoadingScreen .bootMeteorLayer.meteorThree .bootMeteor::before {
+      width: 76px;
+      background: linear-gradient(
+        90deg,
+        rgba(0, 190, 255, 0),
+        rgba(0, 190, 255, 0.16),
+        rgba(0, 190, 255, 0.50),
+        rgba(0, 190, 255, 0.88)
+      );
+    }
+
+    #bootLoadingScreen .bootMeteor::after {
+      width: 52px;
+      background: linear-gradient(
+        90deg,
+        rgba(0, 190, 255, 0),
+        rgba(0, 190, 255, 0.46),
+        rgba(0, 190, 255, 0.98)
+      );
+    }
+
+    #bootLoadingScreen .bootMeteorLayer.meteorTwo .bootMeteor::after {
+      width: 42px;
+      background: linear-gradient(
+        90deg,
+        rgba(0, 190, 255, 0),
+        rgba(0, 190, 255, 0.34),
+        rgba(0, 190, 255, 0.82)
+      );
+    }
+
+    #bootLoadingScreen .bootMeteorLayer.meteorThree .bootMeteor::after {
+      width: 46px;
+      background: linear-gradient(
+        90deg,
+        rgba(0, 190, 255, 0),
+        rgba(0, 190, 255, 0.38),
+        rgba(0, 190, 255, 0.90)
+      );
+    }
+
+    #bootLoadingScreen .bootOuterParticle {
+      background: rgba(0, 190, 255, 0.88);
+      box-shadow:
+        0 0 8px rgba(0, 190, 255, 0.86),
+        0 0 18px rgba(0, 190, 255, 0.52);
+    }
+
+    #bootLoadingScreen .bootLogoSpark {
+      background: rgba(0, 190, 255, 0.96);
+      box-shadow:
+        0 0 20px rgba(0, 190, 255, 1),
+        0 0 48px rgba(0, 190, 255, 0.96),
+        0 0 82px rgba(0, 190, 255, 0.70);
+    }
+
+    #bootLoadingScreen .bootLoadingText,
+    #searchLoadingScreen .bootLoadingText {
+      color: rgb(0, 190, 255);
+      text-shadow:
+        0 0 10px rgba(0, 190, 255, 0.88),
+        0 0 22px rgba(0, 190, 255, 0.48);
+    }
+
+    #bootLoadingScreen .bootProgressText {
+      color: rgb(0, 190, 255);
+      text-shadow:
+        0 0 9px rgba(0, 190, 255, 0.82),
+        0 0 18px rgba(0, 190, 255, 0.42);
+    }
+
+    #bootLoadingScreen .bootProgressBlocks span {
+      background: rgba(0, 48, 86, 0.74);
+      box-shadow: inset 0 0 0 1px rgba(0, 190, 255, 0.25);
+    }
+
+    #bootLoadingScreen .bootProgressBlocks span.on {
+      background: rgb(0, 190, 255);
+      box-shadow:
+        0 0 9px rgba(0, 190, 255, 0.98),
+        0 0 20px rgba(0, 190, 255, 0.68),
+        0 0 34px rgba(0, 190, 255, 0.36);
+    }
+
+    #bootLoadingScreen.bootComplete .bootLogoRing,
+    #bootLoadingScreen.bootComplete .bootLogoCenter {
+      filter:
+        saturate(1.65)
+        contrast(1.08)
+        brightness(1.12)
+        drop-shadow(0 0 14px rgba(0, 190, 255, 1))
+        drop-shadow(0 0 34px rgba(0, 190, 255, 0.82))
+        drop-shadow(0 0 64px rgba(0, 190, 255, 0.52));
+    }
+
+    #bootLoadingScreen.bootComplete .bootLogoRingGlow {
+      opacity: 1;
+      filter:
+        saturate(1.95)
+        contrast(1.1)
+        brightness(1.12)
+        drop-shadow(0 0 30px rgba(0, 190, 255, 1))
+        drop-shadow(0 0 70px rgba(0, 190, 255, 0.96))
+        drop-shadow(0 0 126px rgba(0, 190, 255, 0.70))
+        drop-shadow(0 0 180px rgba(0, 190, 255, 0.42));
+    }
+
+    #bootLoadingScreen.bootComplete .bootMeteor,
+    #bootLoadingScreen.bootComplete .bootOuterParticle,
+    #bootLoadingScreen.bootComplete .bootLogoSpark {
+      filter: brightness(1.18) saturate(1.2);
+    }
+
+    #bootLoadingScreen.bootComplete .bootProgressBlocks span.on {
+      background: rgb(0, 190, 255);
+      box-shadow:
+        0 0 12px rgba(0, 190, 255, 1),
+        0 0 26px rgba(0, 190, 255, 0.86),
+        0 0 44px rgba(0, 190, 255, 0.46);
+    }
+
+    @keyframes bootCompleteBluePulse {
+      0% { filter: brightness(1); }
+      42% { filter: brightness(1.12); }
+      100% { filter: brightness(1); }
+    }
+
+    /* 起動時ローディング発光色 完全統一（同一ネオンブルー） */
+    #bootLoadingScreen {
+      --boot-neon-blue: 0, 190, 255;
+      --boot-neon-blue-deep: 0, 190, 255;
+      --boot-neon-blue-dark: 0, 190, 255;
+    }
+
+    #bootLoadingScreen .bootLogoRing {
+      filter:
+        saturate(1.55)
+        contrast(1.06)
+        drop-shadow(0 0 10px rgba(var(--boot-neon-blue), 0.82))
+        drop-shadow(0 0 24px rgba(var(--boot-neon-blue), 0.52));
+    }
+
+    #bootLoadingScreen .bootLogoRingGlow {
+      filter:
+        saturate(1.62)
+        contrast(1.08)
+        drop-shadow(0 0 22px rgba(var(--boot-neon-blue), 0.98))
+        drop-shadow(0 0 52px rgba(var(--boot-neon-blue), 0.78))
+        drop-shadow(0 0 98px rgba(var(--boot-neon-blue), 0.54))
+        drop-shadow(0 0 142px rgba(var(--boot-neon-blue), 0.34));
+    }
+
+    #bootLoadingScreen .bootLogoCenter {
+      filter:
+        saturate(1.38)
+        contrast(1.04)
+        drop-shadow(0 0 7px rgba(var(--boot-neon-blue), 0.56))
+        drop-shadow(0 0 18px rgba(var(--boot-neon-blue), 0.30));
+    }
+
+    #bootLoadingScreen .bootMeteor {
+      background: rgba(var(--boot-neon-blue), 0.96);
+      box-shadow:
+        0 0 10px rgba(var(--boot-neon-blue), 1),
+        0 0 24px rgba(var(--boot-neon-blue), 0.86),
+        0 0 44px rgba(var(--boot-neon-blue), 0.56);
+    }
+
+    #bootLoadingScreen .bootMeteorLayer.meteorTwo .bootMeteor {
+      background: rgba(var(--boot-neon-blue), 0.88);
+      box-shadow:
+        0 0 9px rgba(var(--boot-neon-blue), 0.92),
+        0 0 20px rgba(var(--boot-neon-blue), 0.70),
+        0 0 36px rgba(var(--boot-neon-blue), 0.44);
+    }
+
+    #bootLoadingScreen .bootMeteorLayer.meteorThree .bootMeteor {
+      background: rgba(var(--boot-neon-blue), 0.92);
+      box-shadow:
+        0 0 9px rgba(var(--boot-neon-blue), 0.96),
+        0 0 22px rgba(var(--boot-neon-blue), 0.76),
+        0 0 40px rgba(var(--boot-neon-blue), 0.48);
+    }
+
+    #bootLoadingScreen .bootMeteor::before {
+      background: linear-gradient(
+        90deg,
+        rgba(var(--boot-neon-blue), 0),
+        rgba(var(--boot-neon-blue), 0.18),
+        rgba(var(--boot-neon-blue), 0.58),
+        rgba(var(--boot-neon-blue), 0.92)
+      );
+    }
+
+    #bootLoadingScreen .bootMeteorLayer.meteorTwo .bootMeteor::before {
+      background: linear-gradient(
+        90deg,
+        rgba(var(--boot-neon-blue), 0),
+        rgba(var(--boot-neon-blue), 0.15),
+        rgba(var(--boot-neon-blue), 0.46),
+        rgba(var(--boot-neon-blue), 0.78)
+      );
+    }
+
+    #bootLoadingScreen .bootMeteorLayer.meteorThree .bootMeteor::before {
+      background: linear-gradient(
+        90deg,
+        rgba(var(--boot-neon-blue), 0),
+        rgba(var(--boot-neon-blue), 0.14),
+        rgba(var(--boot-neon-blue), 0.42),
+        rgba(var(--boot-neon-blue), 0.82)
+      );
+    }
+
+    #bootLoadingScreen .bootMeteor::after {
+      background: linear-gradient(
+        90deg,
+        rgba(var(--boot-neon-blue), 0),
+        rgba(var(--boot-neon-blue), 0.40),
+        rgba(var(--boot-neon-blue), 0.96)
+      );
+    }
+
+    #bootLoadingScreen .bootMeteorLayer.meteorTwo .bootMeteor::after {
+      background: linear-gradient(
+        90deg,
+        rgba(var(--boot-neon-blue), 0),
+        rgba(var(--boot-neon-blue), 0.30),
+        rgba(var(--boot-neon-blue), 0.78)
+      );
+    }
+
+    #bootLoadingScreen .bootMeteorLayer.meteorThree .bootMeteor::after {
+      background: linear-gradient(
+        90deg,
+        rgba(var(--boot-neon-blue), 0),
+        rgba(var(--boot-neon-blue), 0.34),
+        rgba(var(--boot-neon-blue), 0.86)
+      );
+    }
+
+    #bootLoadingScreen .bootOuterParticle,
+    #bootLoadingScreen .bootLogoSpark {
+      background: rgba(var(--boot-neon-blue), 0.92);
+    }
+
+    #bootLoadingScreen .bootOuterParticle {
+      box-shadow:
+        0 0 8px rgba(var(--boot-neon-blue), 0.82),
+        0 0 17px rgba(var(--boot-neon-blue), 0.46);
+    }
+
+    #bootLoadingScreen .bootLogoSpark {
+      box-shadow:
+        0 0 18px rgba(var(--boot-neon-blue), 0.98),
+        0 0 44px rgba(var(--boot-neon-blue), 0.86),
+        0 0 74px rgba(var(--boot-neon-blue), 0.58);
+    }
+
+    #bootLoadingScreen .bootLoadingText,
+    #bootLoadingScreen .bootProgressText {
+      color: rgb(var(--boot-neon-blue));
+      text-shadow:
+        0 0 10px rgba(var(--boot-neon-blue), 0.86),
+        0 0 22px rgba(var(--boot-neon-blue), 0.48);
+    }
+
+    #bootLoadingScreen .bootProgressBlocks span {
+      background: rgba(var(--boot-neon-blue), 0.16);
+      box-shadow: inset 0 0 0 1px rgba(var(--boot-neon-blue), 0.25);
+    }
+
+    #bootLoadingScreen .bootProgressBlocks span.on {
+      background: rgb(var(--boot-neon-blue));
+      box-shadow:
+        0 0 9px rgba(var(--boot-neon-blue), 0.96),
+        0 0 20px rgba(var(--boot-neon-blue), 0.66),
+        0 0 34px rgba(var(--boot-neon-blue), 0.36);
+    }
+
+    #bootLoadingScreen.bootComplete .bootLogoRing,
+    #bootLoadingScreen.bootComplete .bootLogoCenter {
+      filter:
+        saturate(1.72)
+        contrast(1.08)
+        brightness(1.10)
+        drop-shadow(0 0 14px rgba(var(--boot-neon-blue), 1))
+        drop-shadow(0 0 34px rgba(var(--boot-neon-blue), 0.82))
+        drop-shadow(0 0 64px rgba(var(--boot-neon-blue), 0.52));
+    }
+
+    #bootLoadingScreen.bootComplete .bootLogoRingGlow {
+      opacity: 1;
+      filter:
+        saturate(1.95)
+        contrast(1.10)
+        brightness(1.12)
+        drop-shadow(0 0 30px rgba(var(--boot-neon-blue), 1))
+        drop-shadow(0 0 70px rgba(var(--boot-neon-blue), 0.92))
+        drop-shadow(0 0 126px rgba(var(--boot-neon-blue), 0.66))
+        drop-shadow(0 0 180px rgba(var(--boot-neon-blue), 0.42));
+    }
+
+    #bootLoadingScreen.bootComplete .bootProgressBlocks span.on {
+      background: rgb(var(--boot-neon-blue));
+      box-shadow:
+        0 0 12px rgba(var(--boot-neon-blue), 1),
+        0 0 26px rgba(var(--boot-neon-blue), 0.84),
+        0 0 44px rgba(var(--boot-neon-blue), 0.46);
+    }
+
+    /* 起動時ローディング発光色：完全1色統一（RGBは 0, 190, 255 固定／Alphaのみ変更） */
+    #bootLoadingScreen {
+      --boot-neon-blue-one: 0, 190, 255;
+    }
+
+    #bootLoadingScreen .bootLogoRing {
+      filter:
+        saturate(1.55)
+        contrast(1.06)
+        drop-shadow(0 0 10px rgba(0, 190, 255, 0.82))
+        drop-shadow(0 0 24px rgba(0, 190, 255, 0.52));
+    }
+
+    #bootLoadingScreen .bootLogoRingGlow {
+      filter:
+        saturate(1.62)
+        contrast(1.08)
+        drop-shadow(0 0 22px rgba(0, 190, 255, 0.98))
+        drop-shadow(0 0 52px rgba(0, 190, 255, 0.78))
+        drop-shadow(0 0 98px rgba(0, 190, 255, 0.54))
+        drop-shadow(0 0 142px rgba(0, 190, 255, 0.34));
+    }
+
+    #bootLoadingScreen .bootLogoCenter {
+      filter:
+        saturate(1.38)
+        contrast(1.04)
+        drop-shadow(0 0 7px rgba(0, 190, 255, 0.56))
+        drop-shadow(0 0 18px rgba(0, 190, 255, 0.30));
+    }
+
+    #bootLoadingScreen .bootMeteor,
+    #bootLoadingScreen .bootMeteorLayer.meteorTwo .bootMeteor,
+    #bootLoadingScreen .bootMeteorLayer.meteorThree .bootMeteor {
+      background: rgba(0, 190, 255, 0.92);
+      box-shadow:
+        0 0 10px rgba(0, 190, 255, 1),
+        0 0 24px rgba(0, 190, 255, 0.82),
+        0 0 44px rgba(0, 190, 255, 0.54);
+    }
+
+    #bootLoadingScreen .bootMeteor::before,
+    #bootLoadingScreen .bootMeteorLayer.meteorTwo .bootMeteor::before,
+    #bootLoadingScreen .bootMeteorLayer.meteorThree .bootMeteor::before {
+      background: linear-gradient(
+        90deg,
+        rgba(0, 190, 255, 0),
+        rgba(0, 190, 255, 0.16),
+        rgba(0, 190, 255, 0.50),
+        rgba(0, 190, 255, 0.86)
+      );
+    }
+
+    #bootLoadingScreen .bootMeteor::after,
+    #bootLoadingScreen .bootMeteorLayer.meteorTwo .bootMeteor::after,
+    #bootLoadingScreen .bootMeteorLayer.meteorThree .bootMeteor::after {
+      background: linear-gradient(
+        90deg,
+        rgba(0, 190, 255, 0),
+        rgba(0, 190, 255, 0.36),
+        rgba(0, 190, 255, 0.92)
+      );
+    }
+
+    #bootLoadingScreen .bootOuterParticle,
+    #bootLoadingScreen .bootLogoSpark {
+      background: rgba(0, 190, 255, 0.92);
+    }
+
+    #bootLoadingScreen .bootOuterParticle {
+      box-shadow:
+        0 0 8px rgba(0, 190, 255, 0.82),
+        0 0 17px rgba(0, 190, 255, 0.46);
+    }
+
+    #bootLoadingScreen .bootLogoSpark {
+      box-shadow:
+        0 0 18px rgba(0, 190, 255, 0.98),
+        0 0 44px rgba(0, 190, 255, 0.86),
+        0 0 74px rgba(0, 190, 255, 0.58);
+    }
+
+    #bootLoadingScreen .bootLoadingText,
+    #bootLoadingScreen .bootProgressText {
+      color: rgb(0, 190, 255);
+      text-shadow:
+        0 0 10px rgba(0, 190, 255, 0.86),
+        0 0 22px rgba(0, 190, 255, 0.48);
+    }
+
+    #bootLoadingScreen .bootProgressBlocks span {
+      background: rgba(0, 190, 255, 0.16);
+      box-shadow: inset 0 0 0 1px rgba(0, 190, 255, 0.25);
+    }
+
+    #bootLoadingScreen .bootProgressBlocks span.on {
+      background: rgb(0, 190, 255);
+      box-shadow:
+        0 0 9px rgba(0, 190, 255, 0.96),
+        0 0 20px rgba(0, 190, 255, 0.66),
+        0 0 34px rgba(0, 190, 255, 0.36);
+    }
+
+    #bootLoadingScreen.bootComplete .bootLogoRing,
+    #bootLoadingScreen.bootComplete .bootLogoCenter {
+      filter:
+        saturate(1.72)
+        contrast(1.08)
+        brightness(1.10)
+        drop-shadow(0 0 14px rgba(0, 190, 255, 1))
+        drop-shadow(0 0 34px rgba(0, 190, 255, 0.82))
+        drop-shadow(0 0 64px rgba(0, 190, 255, 0.52));
+    }
+
+    #bootLoadingScreen.bootComplete .bootLogoRingGlow {
+      opacity: 1;
+      filter:
+        saturate(1.95)
+        contrast(1.10)
+        brightness(1.12)
+        drop-shadow(0 0 30px rgba(0, 190, 255, 1))
+        drop-shadow(0 0 70px rgba(0, 190, 255, 0.92))
+        drop-shadow(0 0 126px rgba(0, 190, 255, 0.66))
+        drop-shadow(0 0 180px rgba(0, 190, 255, 0.42));
+    }
+
+    #bootLoadingScreen.bootComplete .bootProgressBlocks span.on {
+      background: rgb(0, 190, 255);
+      box-shadow:
+        0 0 12px rgba(0, 190, 255, 1),
+        0 0 26px rgba(0, 190, 255, 0.84),
+        0 0 44px rgba(0, 190, 255, 0.46);
+    }
+
+
   </style>
   <script src="https://unpkg.com/@zxing/library@latest"></script>
   <script>
@@ -324,6 +1106,9 @@
         blocks.forEach(function(block, index) {
           block.classList.toggle("on", index < onCount);
         });
+
+        var screen = document.getElementById("bootLoadingScreen");
+        if (screen) screen.classList.toggle("bootComplete", state.percent >= 99.5);
       }
 
       function startProgressAnimation() {
@@ -546,6 +1331,49 @@
   <div id="bootLoadingScreen" role="status" aria-live="polite">
     <div class="bootLoadingInner">
       <div class="bootLogoWrap" aria-hidden="true">
+        <div class="bootMeteorLayer">
+          <span class="bootMeteor"></span>
+        </div>
+        <div class="bootMeteorLayer meteorTwo">
+          <span class="bootMeteor"></span>
+        </div>
+        <div class="bootMeteorLayer meteorThree">
+          <span class="bootMeteor"></span>
+        </div>
+        <div class="bootOuterParticleLayer">
+            <span class="bootOuterParticle"></span>
+            <span class="bootOuterParticle"></span>
+            <span class="bootOuterParticle"></span>
+            <span class="bootOuterParticle"></span>
+            <span class="bootOuterParticle"></span>
+            <span class="bootOuterParticle"></span>
+            <span class="bootOuterParticle"></span>
+            <span class="bootOuterParticle"></span>
+            <span class="bootOuterParticle"></span>
+            <span class="bootOuterParticle"></span>
+            <span class="bootOuterParticle"></span>
+            <span class="bootOuterParticle"></span>
+            <span class="bootOuterParticle"></span>
+            <span class="bootOuterParticle"></span>
+            <span class="bootOuterParticle"></span>
+            <span class="bootOuterParticle"></span>
+            <span class="bootOuterParticle"></span>
+            <span class="bootOuterParticle"></span>
+            <span class="bootOuterParticle"></span>
+            <span class="bootOuterParticle"></span>
+            <span class="bootOuterParticle"></span>
+            <span class="bootOuterParticle"></span>
+            <span class="bootOuterParticle"></span>
+            <span class="bootOuterParticle"></span>
+            <span class="bootOuterParticle"></span>
+            <span class="bootOuterParticle"></span>
+            <span class="bootOuterParticle"></span>
+            <span class="bootOuterParticle"></span>
+            <span class="bootOuterParticle"></span>
+            <span class="bootOuterParticle"></span>
+            <span class="bootOuterParticle"></span>
+            <span class="bootOuterParticle"></span>
+        </div>
         <div class="bootLogoRingLayer">
           <img class="bootLogoRingGlow" src="ring.png" alt="">
           <img class="bootLogoRing" src="ring.png" alt="">
