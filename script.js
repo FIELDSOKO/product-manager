@@ -46,6 +46,8 @@ let mapScaleValue = 1;
 let mapPinchStartDistance = 0;
 let mapPinchStartScale = 1;
 let currentMapData = null;
+let currentInventoryMarkedListActive = false;
+let currentInventoryMarkedListLocation = "";
 
 function initApp_() {
   setAppVersion();
@@ -178,7 +180,10 @@ function callGas(action, params) {
     query.set("action", action);
     query.set("callback", callbackName);
 
+    const timeoutMs = Math.max(30000, Number(params && params.__timeoutMs || 30000));
+
     Object.keys(params || {}).forEach(function(key) {
+      if (key === "__timeoutMs") return;
       if (params[key] !== undefined && params[key] !== null) {
         query.set(key, String(params[key]));
       }
@@ -191,7 +196,7 @@ function callGas(action, params) {
     const timer = setTimeout(function() {
       cleanup();
       reject(new Error("通信がタイムアウトしました。"));
-    }, 30000);
+    }, timeoutMs);
 
     function cleanup() {
       clearTimeout(timer);
@@ -1385,6 +1390,9 @@ function inventoryClearSearch() {
   if (color) color.value = "";
   if (size) size.value = "";
   if (location) location.value = "";
+  currentInventoryMarkedListActive = false;
+  currentInventoryMarkedListLocation = "";
+
   const card = document.getElementById("inventoryProductCard");
   const listCard = document.getElementById("inventoryListCard");
   if (card) card.classList.add("hidden");
@@ -1395,6 +1403,8 @@ function inventoryClearSearch() {
 function inventorySearch() {
   hideInventoryMessage();
   selectedInventoryItem = null;
+  currentInventoryMarkedListActive = false;
+  currentInventoryMarkedListLocation = "";
 
   const payload = {
     text: (document.getElementById("invTextInput") || {}).value || "",
@@ -1493,6 +1503,12 @@ function inventorySetCurrentStatus_(status) {
     }
     selectedInventoryItem.inventoryStatus = status === "記入済" ? "記入済" : "";
     inventorySelectItem(selectedInventoryItem);
+
+    if (status !== "記入済" && currentInventoryMarkedListActive) {
+      inventoryReloadMarkedList_();
+      return;
+    }
+
     showInventoryMessage("success", status === "記入済" ? "記入済にしました。" : "記入済を解除しました。");
   }).catch(function(err) {
     endSearchLoading_();
@@ -1500,9 +1516,27 @@ function inventorySetCurrentStatus_(status) {
   });
 }
 
+function inventoryClearListOpenState_() {
+  selectedInventoryItem = null;
+
+  const productCard = document.getElementById("inventoryProductCard");
+  const listCard = document.getElementById("inventoryListCard");
+  const list = document.getElementById("inventoryList");
+
+  if (productCard) productCard.classList.add("hidden");
+  if (listCard) listCard.classList.add("hidden");
+  if (list) list.innerHTML = "";
+
+  hideInventoryMessage();
+}
+
 function inventoryShowMarkedAll() {
+  inventoryClearListOpenState_();
+  currentInventoryMarkedListActive = true;
+  currentInventoryMarkedListLocation = "";
+
   beginSearchLoading_();
-  callGas("inventoryListMarkedProducts", {})
+  callGas("inventoryListMarkedProducts", { __timeoutMs: 60000 })
     .then(function(res) {
       endSearchLoading_();
       if (!res || !res.ok) {
@@ -1511,6 +1545,32 @@ function inventoryShowMarkedAll() {
       }
       inventoryRenderGroupedList(res.groups || [], "記入済商品一覧（全ロケ）");
       showInventoryMessage("info", "記入済商品を表示しました。");
+    })
+    .catch(function(err) {
+      endSearchLoading_();
+      showInventoryMessage("error", err && err.message ? err.message : String(err));
+    });
+}
+
+function inventoryReloadMarkedList_() {
+  const location = currentInventoryMarkedListLocation || "";
+  beginSearchLoading_();
+  callGas("inventoryListMarkedProducts", { location: location, __timeoutMs: 60000 })
+    .then(function(res) {
+      endSearchLoading_();
+      if (!res || !res.ok) {
+        showInventoryMessage("error", res && res.message ? res.message : "一覧取得に失敗しました。");
+        return;
+      }
+      const productCard = document.getElementById("inventoryProductCard");
+      if (productCard) productCard.classList.add("hidden");
+      selectedInventoryItem = null;
+
+      inventoryRenderGroupedList(
+        res.groups || [],
+        location ? ("記入済商品一覧：" + location) : "記入済商品一覧（全ロケ）"
+      );
+      showInventoryMessage("success", "記入済を解除しました。");
     })
     .catch(function(err) {
       endSearchLoading_();
@@ -1539,6 +1599,8 @@ function inventoryClearAllMarked() {
 }
 
 function inventoryRenderList(items, title) {
+  currentInventoryMarkedListActive = false;
+  currentInventoryMarkedListLocation = "";
   const card = document.getElementById("inventoryListCard");
   const titleEl = document.getElementById("inventoryListTitle");
   const list = document.getElementById("inventoryList");
@@ -1590,7 +1652,13 @@ function inventoryRenderGroupedList(groups, title) {
       div.innerHTML =
         "<div><strong>" + escapeHtml(item.hinban) + "</strong> / " + escapeHtml(item.name) + "</div>" +
         "<div class=\"small\">JAN：" + escapeHtml(item.jan) + "</div>" +
-        "<div class=\"small\">色：" + escapeHtml(item.color) + " / サイズ：" + escapeHtml(item.size) + "</div>";
+        "<div class=\"small\">色：" + escapeHtml(item.color) + " / サイズ：" + escapeHtml(item.size) + "</div>" +
+        "<div class=\"small\">タップして詳細表示・記入済解除できます。</div>";
+      div.onclick = function() {
+        inventorySelectItem(Object.assign({}, item, { inventoryStatus: "記入済" }));
+        card.classList.add("hidden");
+        showInventoryMessage("info", "商品詳細を表示しました。必要なら「記入済解除」を押してください。");
+      };
       list.appendChild(div);
     });
   });
@@ -1660,6 +1728,7 @@ function renderInventoryMap(data) {
       };
     } else {
       div.classList.add("mapCellBlank");
+      if (!value) div.classList.add("mapCellEmpty");
     }
 
     grid.appendChild(div);
@@ -1738,7 +1807,7 @@ function mapClearAllLocationStates() {
 
 function mapShowMarkedAll() {
   beginSearchLoading_();
-  callGas("inventoryListMarkedProducts", {})
+  callGas("inventoryListMarkedProducts", { __timeoutMs: 60000 })
     .then(function(res) {
       endSearchLoading_();
       if (!res || !res.ok) {
@@ -1746,6 +1815,8 @@ function mapShowMarkedAll() {
         return;
       }
       showMainSection("inventory");
+      currentInventoryMarkedListActive = true;
+      currentInventoryMarkedListLocation = "";
       inventoryRenderGroupedList(res.groups || [], "記入済 全ロケ商品一覧");
     })
     .catch(function(err) {
@@ -1758,7 +1829,7 @@ function mapShowSelectedMarkedProducts() {
   if (!selectedMapLocation || !isInventoryLocationText_(selectedMapLocation)) return;
   closeMapActionSheet();
   beginSearchLoading_();
-  callGas("inventoryListMarkedProducts", { location: selectedMapLocation })
+  callGas("inventoryListMarkedProducts", { location: selectedMapLocation, __timeoutMs: 60000 })
     .then(function(res) {
       endSearchLoading_();
       if (!res || !res.ok) {
@@ -1766,6 +1837,8 @@ function mapShowSelectedMarkedProducts() {
         return;
       }
       showMainSection("inventory");
+      currentInventoryMarkedListActive = true;
+      currentInventoryMarkedListLocation = selectedMapLocation || "";
       inventoryRenderGroupedList(res.groups || [], "記入済商品一覧：" + selectedMapLocation);
     })
     .catch(function(err) {
