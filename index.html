@@ -831,6 +831,12 @@
           <button class="secondary" onclick="mapShowMarkedAll()">📦記入済 全ロケ商品一覧</button>
           <button class="danger" onclick="mapClearAllLocationStates()">🧹全ロケ状態クリア</button>
         </div>
+        <div class="mapZoomControls" aria-label="マップ倍率操作">
+          <div class="mapZoomLabel" id="mapZoomLabel">現在倍率 100%</div>
+          <button class="secondary" onclick="mapZoomOut()">－</button>
+          <button class="secondary" onclick="mapZoomIn()">＋</button>
+          <button class="primary" onclick="mapFitWhole()">全体表示</button>
+        </div>
         <div id="mapMessage" class="msg"></div>
       </div>
 

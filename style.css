@@ -601,3 +601,40 @@ body.map-active .mapOuter {
   font-size: clamp(9px, 2.6vw, 14px);
 }
 
+
+/* 棚卸しマップ倍率操作（既存機能へ影響しない追加） */
+.mapZoomControls {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 8px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.mapZoomControls button {
+  padding: 10px 12px;
+  min-width: 46px;
+}
+
+.mapZoomLabel {
+  font-size: 13px;
+  font-weight: 900;
+  color: #111827;
+  background: #f3f4f6;
+  border-radius: 12px;
+  padding: 10px 12px;
+  text-align: center;
+}
+
+.mapCellAutoFit {
+  overflow: hidden;
+}
+
+@media (max-width: 420px) {
+  .mapZoomControls {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+  .mapZoomLabel {
+    grid-column: 1 / -1;
+  }
+}

@@ -46,6 +46,8 @@ let mapScaleValue = 1;
 let mapMinScaleValue = 0.6;
 let mapPinchStartDistance = 0;
 let mapPinchStartScale = 1;
+let mapPinchCenterClientX = 0;
+let mapPinchCenterClientY = 0;
 let currentMapData = null;
 let currentInventoryMarkedListActive = false;
 let currentInventoryMarkedListLocation = "";
@@ -1820,6 +1822,7 @@ function renderInventoryMapGrid_(grid, data, readOnly) {
     }
 
     grid.appendChild(div);
+    autoFitMapCellText_(div);
   });
 
   setupMapPinch_();
@@ -1848,20 +1851,54 @@ function applyMapCellSpreadsheetStyle_(div, style, isLocation, state, value) {
 
   const fontSize = Number(style.fontSize || 12);
   if (fontSize) {
-    const textLen = String(value || "").length;
-    const maxSize = textLen >= 8 ? 11 : textLen >= 5 ? 12 : 14;
-    div.style.fontSize = Math.max(9, Math.min(fontSize, maxSize)) + "px";
+    div.style.fontSize = Math.max(8, Math.min(fontSize, 30)) + "px";
+  }
+
+  applyMapCellBorderStyle_(div, style);
+
+  if (isLocation) {
+    div.classList.add("mapCellAutoFit");
+  }
+}
+
+function autoFitMapCellText_(div) {
+  if (!div || !String(div.textContent || "").trim()) return;
+
+  let size = parseFloat(div.style.fontSize || "12") || 12;
+  const minSize = 8;
+
+  // DOM配置直後に、セル内へ収まらない場合だけ段階的に縮小する。
+  while (size > minSize && (div.scrollWidth > div.clientWidth + 1 || div.scrollHeight > div.clientHeight + 1)) {
+    size -= 1;
+    div.style.fontSize = size + "px";
+  }
+}
+
+function applyMapCellBorderStyle_(div, style) {
+  const borders = style && style.borders ? style.borders : null;
+
+  if (borders) {
+    ["top", "right", "bottom", "left"].forEach(function(side) {
+      const border = borders[side] || {};
+      const prop = side.charAt(0).toUpperCase() + side.slice(1);
+
+      if (border.visible) {
+        div.style["border" + prop + "Style"] = "solid";
+        div.style["border" + prop + "Width"] = String(border.width || 1) + "px";
+        div.style["border" + prop + "Color"] = border.color || style.borderColor || "#4b5563";
+      } else {
+        div.style["border" + prop + "Style"] = "solid";
+        div.style["border" + prop + "Width"] = "0px";
+        div.style["border" + prop + "Color"] = "transparent";
+      }
+    });
   }
 
   if (style.hasBorder) {
     div.classList.add("mapCellHasBorder");
-    div.style.borderColor = style.borderColor || "#4b5563";
+    if (!borders) div.style.borderColor = style.borderColor || "#4b5563";
   } else {
     div.classList.add("mapCellNoBorder");
-  }
-
-  if (isLocation) {
-    div.classList.add("mapCellAutoFit");
   }
 }
 
@@ -2020,12 +2057,12 @@ function fitInventoryMapToScreen_() {
   scale.style.transform = "scale(" + mapScaleValue + ")";
   outer.scrollLeft = 0;
   outer.scrollTop = 0;
+  updateMapZoomLabel_();
 }
 
 function setupMapPinch_() {
   const outer = document.getElementById("mapOuter");
-  const scale = document.getElementById("mapScale");
-  if (!outer || !scale || outer.dataset.pinchReady === "1") return;
+  if (!outer || outer.dataset.pinchReady === "1") return;
 
   outer.dataset.pinchReady = "1";
 
@@ -2033,6 +2070,8 @@ function setupMapPinch_() {
     if (e.touches && e.touches.length === 2) {
       mapPinchStartDistance = getTouchDistance_(e.touches[0], e.touches[1]);
       mapPinchStartScale = mapScaleValue || 1;
+      mapPinchCenterClientX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      mapPinchCenterClientY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
     }
   }, { passive: true });
 
@@ -2040,16 +2079,71 @@ function setupMapPinch_() {
     if (e.touches && e.touches.length === 2 && mapPinchStartDistance) {
       e.preventDefault();
       const d = getTouchDistance_(e.touches[0], e.touches[1]);
-      mapScaleValue = Math.max(mapMinScaleValue || 0.05, Math.min(3, mapPinchStartScale * (d / mapPinchStartDistance)));
-      scale.style.transform = "scale(" + mapScaleValue + ")";
+      const centerX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const centerY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      const nextScale = Math.max(mapMinScaleValue || 0.05, Math.min(4, mapPinchStartScale * (d / mapPinchStartDistance)));
+      setInventoryMapScale_(nextScale, centerX || mapPinchCenterClientX, centerY || mapPinchCenterClientY);
     }
   }, { passive: false });
+
+  outer.addEventListener("touchend", function(e) {
+    if (!e.touches || e.touches.length < 2) {
+      mapPinchStartDistance = 0;
+    }
+  }, { passive: true });
 
   window.addEventListener("orientationchange", function() {
     setTimeout(function() {
       if (currentMapData) renderInventoryMap(currentMapData);
     }, 300);
   });
+}
+
+function setInventoryMapScale_(nextScale, centerClientX, centerClientY) {
+  const outer = document.getElementById("mapOuter");
+  const scale = document.getElementById("mapScale");
+  if (!outer || !scale) return;
+
+  const oldScale = mapScaleValue || 1;
+  nextScale = Math.max(mapMinScaleValue || 0.05, Math.min(4, Number(nextScale || oldScale)));
+
+  const rect = outer.getBoundingClientRect();
+  const centerX = Number.isFinite(centerClientX) ? centerClientX - rect.left : outer.clientWidth / 2;
+  const centerY = Number.isFinite(centerClientY) ? centerClientY - rect.top : outer.clientHeight / 2;
+
+  const contentX = (outer.scrollLeft + centerX) / oldScale;
+  const contentY = (outer.scrollTop + centerY) / oldScale;
+
+  mapScaleValue = nextScale;
+  scale.style.transform = "scale(" + mapScaleValue + ")";
+
+  outer.scrollLeft = Math.max(0, contentX * mapScaleValue - centerX);
+  outer.scrollTop = Math.max(0, contentY * mapScaleValue - centerY);
+  updateMapZoomLabel_();
+}
+
+function updateMapZoomLabel_() {
+  const el = document.getElementById("mapZoomLabel");
+  if (!el) return;
+  el.textContent = "現在倍率 " + Math.round((mapScaleValue || 1) * 100) + "%";
+}
+
+function mapZoomIn() {
+  const outer = document.getElementById("mapOuter");
+  if (!outer) return;
+  const rect = outer.getBoundingClientRect();
+  setInventoryMapScale_((mapScaleValue || 1) * 1.2, rect.left + outer.clientWidth / 2, rect.top + outer.clientHeight / 2);
+}
+
+function mapZoomOut() {
+  const outer = document.getElementById("mapOuter");
+  if (!outer) return;
+  const rect = outer.getBoundingClientRect();
+  setInventoryMapScale_((mapScaleValue || 1) / 1.2, rect.left + outer.clientWidth / 2, rect.top + outer.clientHeight / 2);
+}
+
+function mapFitWhole() {
+  fitInventoryMapToScreen_();
 }
 
 function getTouchDistance_(a, b) {
