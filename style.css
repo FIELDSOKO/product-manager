@@ -638,3 +638,25 @@ body.map-active .mapOuter {
 .mapOverviewGrid .mapCell {
   pointer-events: none;
 }
+
+
+/* 全体図は通常マップと同じデータを一画面で確認しやすく表示 */
+.mapOverviewOuter {
+  overflow: hidden;
+}
+
+.mapOverviewGrid {
+  transform-origin: 0 0;
+}
+
+.mapOverviewGrid .mapCell {
+  min-width: 52px;
+  min-height: 30px;
+  font-size: 10px;
+  padding: 2px;
+}
+
+#inventoryBackToEntryBtn {
+  margin-top: 0;
+  margin-bottom: 12px;
+}

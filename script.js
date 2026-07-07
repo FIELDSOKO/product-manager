@@ -49,6 +49,7 @@ let currentMapData = null;
 let currentInventoryMarkedListActive = false;
 let currentInventoryMarkedListLocation = "";
 let currentInventoryMarkedListTitle = "";
+let currentInventoryBackButtonLabel = "記入済商品一覧へ戻る";
 
 function initApp_() {
   setAppVersion();
@@ -96,6 +97,7 @@ function showMainSection(section) {
 function openInventoryMenu() {
   beginSearchLoading_();
   showMainSection("inventory");
+  inventoryClearDisplayOnly_();
   setTimeout(endSearchLoading_, 120);
 }
 
@@ -1393,6 +1395,8 @@ function inventoryClearSearch() {
   if (location) location.value = "";
   currentInventoryMarkedListActive = false;
   currentInventoryMarkedListLocation = "";
+  currentInventoryMarkedListTitle = "";
+  currentInventoryBackButtonLabel = "記入済商品一覧へ戻る";
 
   const card = document.getElementById("inventoryProductCard");
   const listCard = document.getElementById("inventoryListCard");
@@ -1401,11 +1405,43 @@ function inventoryClearSearch() {
   hideInventoryMessage();
 }
 
-function inventorySearch() {
-  hideInventoryMessage();
+function inventoryClearDisplayOnly_() {
   selectedInventoryItem = null;
   currentInventoryMarkedListActive = false;
   currentInventoryMarkedListLocation = "";
+  currentInventoryMarkedListTitle = "";
+  currentInventoryBackButtonLabel = "記入済商品一覧へ戻る";
+
+  const productCard = document.getElementById("inventoryProductCard");
+  const listCard = document.getElementById("inventoryListCard");
+  const list = document.getElementById("inventoryList");
+
+  if (productCard) productCard.classList.add("hidden");
+  if (listCard) listCard.classList.add("hidden");
+  if (list) list.innerHTML = "";
+
+  updateInventoryBackToMarkedListButton_();
+  hideInventoryMessage();
+}
+
+function inventoryBackToEntry() {
+  selectedInventoryItem = null;
+  currentInventoryMarkedListActive = false;
+  currentInventoryMarkedListLocation = "";
+  currentInventoryMarkedListTitle = "";
+  currentInventoryBackButtonLabel = "記入済商品一覧へ戻る";
+
+  const productCard = document.getElementById("inventoryProductCard");
+  const listCard = document.getElementById("inventoryListCard");
+  if (productCard) productCard.classList.add("hidden");
+  if (listCard) listCard.classList.add("hidden");
+
+  updateInventoryBackToMarkedListButton_();
+  hideInventoryMessage();
+}
+
+function inventorySearch() {
+  inventoryClearDisplayOnly_();
 
   const payload = {
     text: (document.getElementById("invTextInput") || {}).value || "",
@@ -1450,6 +1486,7 @@ function inventorySearch() {
 function updateInventoryBackToMarkedListButton_() {
   const btn = document.getElementById("inventoryBackToMarkedListBtn");
   if (!btn) return;
+  btn.textContent = currentInventoryBackButtonLabel || "一覧へ戻る";
   btn.classList.toggle("hidden", !currentInventoryMarkedListActive);
 }
 
@@ -1540,6 +1577,8 @@ function inventorySetCurrentStatus_(status) {
 function inventoryClearListOpenState_() {
   selectedInventoryItem = null;
 
+  currentInventoryBackButtonLabel = "記入済商品一覧へ戻る";
+
   const productCard = document.getElementById("inventoryProductCard");
   const listCard = document.getElementById("inventoryListCard");
   const list = document.getElementById("inventoryList");
@@ -1556,6 +1595,8 @@ function inventoryShowMarkedAll() {
   inventoryClearListOpenState_();
   currentInventoryMarkedListActive = true;
   currentInventoryMarkedListLocation = "";
+  currentInventoryMarkedListTitle = "記入済商品一覧（全ロケ）";
+  currentInventoryBackButtonLabel = "記入済商品一覧へ戻る";
 
   beginSearchLoading_();
   callGas("inventoryListMarkedProducts", { __timeoutMs: 60000 })
@@ -1622,9 +1663,13 @@ function inventoryClearAllMarked() {
     });
 }
 
-function inventoryRenderList(items, title) {
-  currentInventoryMarkedListActive = false;
-  currentInventoryMarkedListLocation = "";
+function inventoryRenderList(items, title, keepReturnState) {
+  if (!keepReturnState) {
+    currentInventoryMarkedListActive = false;
+    currentInventoryMarkedListLocation = "";
+    currentInventoryMarkedListTitle = "";
+    currentInventoryBackButtonLabel = "記入済商品一覧へ戻る";
+  }
   const card = document.getElementById("inventoryListCard");
   const titleEl = document.getElementById("inventoryListTitle");
   const list = document.getElementById("inventoryList");
@@ -1632,6 +1677,7 @@ function inventoryRenderList(items, title) {
 
   currentInventoryMarkedListTitle = title || "一覧";
   if (titleEl) titleEl.textContent = currentInventoryMarkedListTitle;
+  updateInventoryBackToMarkedListButton_();
   list.innerHTML = "";
 
   (items || []).forEach(function(item) {
@@ -1664,6 +1710,7 @@ function inventoryRenderGroupedList(groups, title) {
 
   currentInventoryMarkedListTitle = title || "一覧";
   if (titleEl) titleEl.textContent = currentInventoryMarkedListTitle;
+  updateInventoryBackToMarkedListButton_();
   list.innerHTML = "";
 
   (groups || []).forEach(function(group) {
@@ -1727,6 +1774,7 @@ function renderInventoryMap(data) {
 function renderInventoryMapGrid_(grid, data, readOnly) {
   if (!grid) return;
 
+  const stateMap = (data && data.locationStates) || currentMapState || {};
   const rows = Number(data.rows || 1);
   const cols = Number(data.cols || 1);
   const portraitMap = shouldUsePortraitMapLayout_();
@@ -1739,7 +1787,7 @@ function renderInventoryMapGrid_(grid, data, readOnly) {
     const div = document.createElement("div");
     const value = cell.value || "";
     const isLocation = !!cell.isLocation || isInventoryLocationText_(value);
-    const state = isLocation ? (currentMapState[value] || "") : "";
+    const state = isLocation ? (stateMap[value] || "") : "";
     const row = Number(cell.row || 1);
     const col = Number(cell.col || 1);
     const rowspan = Number(cell.rowspan || 1);
@@ -1889,6 +1937,8 @@ function mapShowMarkedAll() {
       showMainSection("inventory");
       currentInventoryMarkedListActive = true;
       currentInventoryMarkedListLocation = "";
+      currentInventoryMarkedListTitle = "記入済 全ロケ商品一覧";
+      currentInventoryBackButtonLabel = "一覧へ戻る";
       inventoryRenderGroupedList(res.groups || [], "記入済 全ロケ商品一覧");
     })
     .catch(function(err) {
@@ -1928,7 +1978,11 @@ function mapShowSelectedProductsByStatus(filter) {
         : statusFilter === "unmarked"
           ? "このロケの未記入商品：" + location
           : "このロケの商品一覧：" + location;
-      inventoryRenderList(res.items || [], title);
+      currentInventoryMarkedListActive = true;
+      currentInventoryMarkedListLocation = location;
+      currentInventoryMarkedListTitle = title;
+      currentInventoryBackButtonLabel = "一覧へ戻る";
+      inventoryRenderList(res.items || [], title, true);
     })
     .catch(function(err) {
       endSearchLoading_();
@@ -1975,7 +2029,34 @@ function loadMapOverview(floor) {
 
 function renderMapOverview_(data) {
   const grid = document.getElementById("mapOverviewGrid");
+  const outer = grid ? grid.closest(".mapOverviewOuter") : null;
+  if (!grid) return;
+
+  grid.style.transform = "scale(1)";
   renderInventoryMapGrid_(grid, data, true);
+
+  requestAnimationFrame(function() {
+    fitMapOverviewToScreen_(grid, outer);
+  });
+}
+
+function fitMapOverviewToScreen_(grid, outer) {
+  if (!grid || !outer) return;
+
+  grid.style.transformOrigin = "0 0";
+  grid.style.transform = "scale(1)";
+
+  const availableW = Math.max(1, outer.clientWidth - 6);
+  const availableH = Math.max(1, outer.clientHeight - 6);
+  const rawW = Math.max(1, grid.scrollWidth);
+  const rawH = Math.max(1, grid.scrollHeight);
+  const scale = Math.min(1, availableW / rawW, availableH / rawH);
+
+  grid.style.transform = "scale(" + scale + ")";
+  grid.style.width = rawW + "px";
+  grid.style.height = rawH + "px";
+  outer.scrollLeft = 0;
+  outer.scrollTop = 0;
 }
 
 function setupMapPinch_() {
@@ -2023,5 +2104,10 @@ document.addEventListener("DOMContentLoaded", function() {
 window.addEventListener("resize", function() {
   if (activeSection === "map" && currentMapData) {
     renderInventoryMap(currentMapData);
+  }
+  const overviewBack = document.getElementById("mapOverviewBack");
+  const overviewGrid = document.getElementById("mapOverviewGrid");
+  if (overviewBack && overviewBack.classList.contains("show") && overviewGrid) {
+    fitMapOverviewToScreen_(overviewGrid, overviewGrid.closest(".mapOverviewOuter"));
   }
 });
