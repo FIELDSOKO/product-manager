@@ -555,3 +555,20 @@ button {
     min-width: 74px;
   }
 }
+
+
+body.map-active .app {
+  max-width: none;
+}
+
+body.map-active .mapOuter {
+  width: calc(100vw - 28px);
+  max-width: none;
+}
+
+@media (orientation: landscape) {
+  body.map-active .mapOuter {
+    height: calc(100dvh - 210px);
+    min-height: 300px;
+  }
+}

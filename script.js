@@ -45,6 +45,7 @@ let currentMapState = {};
 let mapScaleValue = 1;
 let mapPinchStartDistance = 0;
 let mapPinchStartScale = 1;
+let currentMapData = null;
 
 function initApp_() {
   setAppVersion();
@@ -74,8 +75,10 @@ function showMainSection(section) {
   if (search) search.classList.toggle("hidden", activeSection !== "search");
   if (inv) inv.classList.toggle("hidden", activeSection !== "inventory");
   if (map) map.classList.toggle("hidden", activeSection !== "map");
+  if (document.body) document.body.classList.toggle("map-active", activeSection === "map");
 
   if (activeSection === "search") {
+    scannerMode = "search";
     setTimeout(function() {
       const textInput = document.getElementById("textInput");
       if (textInput) textInput.focus();
@@ -85,6 +88,17 @@ function showMainSection(section) {
   if (activeSection === "map") {
     loadInventoryMap(currentMapFloor || "1F");
   }
+}
+
+function openInventoryMenu() {
+  beginSearchLoading_();
+  showMainSection("inventory");
+  setTimeout(endSearchLoading_, 120);
+}
+
+function openMapMenu() {
+  beginSearchLoading_();
+  showMainSection("map");
 }
 
 function showInventoryMessage(type, text) {
@@ -1356,10 +1370,20 @@ function startInventoryScanner() {
 
 function inventoryClearSearch() {
   selectedInventoryItem = null;
+  const text = document.getElementById("invTextInput");
   const jan = document.getElementById("invJanInput");
   const hinban = document.getElementById("invHinbanInput");
+  const name = document.getElementById("invNameInput");
+  const color = document.getElementById("invColorInput");
+  const size = document.getElementById("invSizeInput");
+  const location = document.getElementById("invLocationInput");
+  if (text) text.value = "";
   if (jan) jan.value = "";
   if (hinban) hinban.value = "";
+  if (name) name.value = "";
+  if (color) color.value = "";
+  if (size) size.value = "";
+  if (location) location.value = "";
   const card = document.getElementById("inventoryProductCard");
   const listCard = document.getElementById("inventoryListCard");
   if (card) card.classList.add("hidden");
@@ -1372,19 +1396,24 @@ function inventorySearch() {
   selectedInventoryItem = null;
 
   const payload = {
+    text: (document.getElementById("invTextInput") || {}).value || "",
     jan: (document.getElementById("invJanInput") || {}).value || "",
-    hinban: (document.getElementById("invHinbanInput") || {}).value || ""
+    hinban: (document.getElementById("invHinbanInput") || {}).value || "",
+    name: (document.getElementById("invNameInput") || {}).value || "",
+    color: (document.getElementById("invColorInput") || {}).value || "",
+    size: (document.getElementById("invSizeInput") || {}).value || "",
+    location: (document.getElementById("invLocationInput") || {}).value || ""
   };
 
-  if (!String(payload.jan || "").trim() && !String(payload.hinban || "").trim()) {
-    showInventoryMessage("error", "JANまたは品番を入力してください。");
+  if (!String(payload.text || "").trim() && !String(payload.jan || "").trim() && !String(payload.hinban || "").trim() && !String(payload.name || "").trim() && !String(payload.color || "").trim() && !String(payload.size || "").trim() && !String(payload.location || "").trim()) {
+    showInventoryMessage("error", "検索条件を入力してください。");
     return;
   }
 
-  setLoading(true);
+  beginSearchLoading_();
   callGas("inventorySearch", payload)
     .then(function(res) {
-      setLoading(false);
+      endSearchLoading_();
       if (!res || !res.ok) {
         showInventoryMessage("error", res && res.message ? res.message : "商品が見つかりませんでした。");
         return;
@@ -1401,7 +1430,7 @@ function inventorySearch() {
       showInventoryMessage("info", items.length + "件見つかりました。商品を選んでください。");
     })
     .catch(function(err) {
-      setLoading(false);
+      endSearchLoading_();
       showInventoryMessage("error", err && err.message ? err.message : String(err));
     });
 }
@@ -1442,7 +1471,7 @@ function inventorySetCurrentStatus_(status) {
     return;
   }
 
-  setLoading(true);
+  beginSearchLoading_();
   callGas("inventorySetProductState", {
     rowNo: selectedInventoryItem.rowNo,
     inventoryKey: selectedInventoryItem.inventoryKey || "",
@@ -1452,7 +1481,7 @@ function inventorySetCurrentStatus_(status) {
     size: selectedInventoryItem.size || "",
     status: status
   }).then(function(res) {
-    setLoading(false);
+    endSearchLoading_();
     if (!res || !res.ok) {
       showInventoryMessage("error", res && res.message ? res.message : "保存に失敗しました。");
       return;
@@ -1465,16 +1494,16 @@ function inventorySetCurrentStatus_(status) {
     inventorySelectItem(selectedInventoryItem);
     showInventoryMessage("success", status === "記入済" ? "記入済にしました。" : "記入済を解除しました。");
   }).catch(function(err) {
-    setLoading(false);
+    endSearchLoading_();
     showInventoryMessage("error", err && err.message ? err.message : String(err));
   });
 }
 
 function inventoryShowMarkedAll() {
-  setLoading(true);
+  beginSearchLoading_();
   callGas("inventoryListMarkedProducts", {})
     .then(function(res) {
-      setLoading(false);
+      endSearchLoading_();
       if (!res || !res.ok) {
         showInventoryMessage("error", res && res.message ? res.message : "一覧取得に失敗しました。");
         return;
@@ -1483,7 +1512,7 @@ function inventoryShowMarkedAll() {
       showInventoryMessage("info", "記入済商品を表示しました。");
     })
     .catch(function(err) {
-      setLoading(false);
+      endSearchLoading_();
       showInventoryMessage("error", err && err.message ? err.message : String(err));
     });
 }
@@ -1491,10 +1520,10 @@ function inventoryShowMarkedAll() {
 function inventoryClearAllMarked() {
   if (!confirm("全商品の記入済を解除しますか？")) return;
 
-  setLoading(true);
+  beginSearchLoading_();
   callGas("inventoryClearAllProductStates", {})
     .then(function(res) {
-      setLoading(false);
+      endSearchLoading_();
       if (!res || !res.ok) {
         showInventoryMessage("error", res && res.message ? res.message : "解除に失敗しました。");
         return;
@@ -1503,7 +1532,7 @@ function inventoryClearAllMarked() {
       showInventoryMessage("success", "全商品の記入済を解除しました。");
     })
     .catch(function(err) {
-      setLoading(false);
+      endSearchLoading_();
       showInventoryMessage("error", err && err.message ? err.message : String(err));
     });
 }
@@ -1576,20 +1605,21 @@ function loadInventoryMap(floor) {
   currentMapFloor = floor || currentMapFloor || "1F";
   hideMapMessage();
 
-  setLoading(true);
+  beginSearchLoading_();
   callGas("inventoryGetMap", { floor: currentMapFloor })
     .then(function(res) {
-      setLoading(false);
+      endSearchLoading_();
       if (!res || !res.ok) {
         showMapMessage("error", res && res.message ? res.message : "マップを取得できませんでした。");
         return;
       }
       currentMapState = res.locationStates || {};
+      currentMapData = res;
       renderInventoryMap(res);
       showMapMessage("info", currentMapFloor === "2F" ? "2階を表示中です。" : "1階を表示中です。");
     })
     .catch(function(err) {
-      setLoading(false);
+      endSearchLoading_();
       showMapMessage("error", err && err.message ? err.message : String(err));
     });
 }
@@ -1600,9 +1630,10 @@ function renderInventoryMap(data) {
 
   const rows = Number(data.rows || 1);
   const cols = Number(data.cols || 1);
+  const portraitMap = shouldUsePortraitMapLayout_();
   grid.innerHTML = "";
-  grid.style.gridTemplateColumns = "repeat(" + cols + ", minmax(64px, 88px))";
-  grid.style.gridTemplateRows = "repeat(" + rows + ", minmax(36px, 44px))";
+  grid.style.gridTemplateColumns = "repeat(" + (portraitMap ? rows : cols) + ", minmax(64px, 88px))";
+  grid.style.gridTemplateRows = "repeat(" + (portraitMap ? cols : rows) + ", minmax(36px, 44px))";
 
   const cells = data.cells || [];
   cells.forEach(function(cell) {
@@ -1610,11 +1641,15 @@ function renderInventoryMap(data) {
     const value = cell.value || "";
     const isLocation = !!cell.isLocation || isInventoryLocationText_(value);
     const state = isLocation ? (currentMapState[value] || "") : "";
+    const row = Number(cell.row || 1);
+    const col = Number(cell.col || 1);
+    const rowspan = Number(cell.rowspan || 1);
+    const colspan = Number(cell.colspan || 1);
 
     div.className = "mapCell " + getMapStateClass_(state);
     div.textContent = value;
-    div.style.gridColumn = String(cell.col || 1) + " / span " + String(cell.colspan || 1);
-    div.style.gridRow = String(cell.row || 1) + " / span " + String(cell.rowspan || 1);
+    div.style.gridColumn = portraitMap ? String(row) + " / span " + String(rowspan) : String(col) + " / span " + String(colspan);
+    div.style.gridRow = portraitMap ? String(col) + " / span " + String(colspan) : String(row) + " / span " + String(rowspan);
     div.title = value;
 
     if (value && isLocation) {
@@ -1629,6 +1664,10 @@ function renderInventoryMap(data) {
   });
 
   setupMapPinch_();
+}
+
+function shouldUsePortraitMapLayout_() {
+  return window.innerHeight > window.innerWidth;
 }
 
 function getMapStateClass_(state) {
@@ -1657,12 +1696,12 @@ function closeMapActionSheet() {
 function mapSetSelectedLocationState(state) {
   if (!selectedMapLocation || !isInventoryLocationText_(selectedMapLocation)) return;
 
-  setLoading(true);
+  beginSearchLoading_();
   callGas("inventorySetLocationState", {
     location: selectedMapLocation,
     status: state || ""
   }).then(function(res) {
-    setLoading(false);
+    endSearchLoading_();
     if (!res || !res.ok) {
       showMapMessage("error", res && res.message ? res.message : "ロケ状態の保存に失敗しました。");
       return;
@@ -1670,7 +1709,7 @@ function mapSetSelectedLocationState(state) {
     closeMapActionSheet();
     loadInventoryMap(currentMapFloor);
   }).catch(function(err) {
-    setLoading(false);
+    endSearchLoading_();
     showMapMessage("error", err && err.message ? err.message : String(err));
   });
 }
@@ -1678,10 +1717,10 @@ function mapSetSelectedLocationState(state) {
 function mapClearAllLocationStates() {
   if (!confirm("全ロケ状態をクリアしますか？商品記入済状態は消えません。")) return;
 
-  setLoading(true);
+  beginSearchLoading_();
   callGas("inventoryClearAllLocationStates", {})
     .then(function(res) {
-      setLoading(false);
+      endSearchLoading_();
       if (!res || !res.ok) {
         showMapMessage("error", res && res.message ? res.message : "クリアに失敗しました。");
         return;
@@ -1690,16 +1729,16 @@ function mapClearAllLocationStates() {
       showMapMessage("success", "全ロケ状態をクリアしました。");
     })
     .catch(function(err) {
-      setLoading(false);
+      endSearchLoading_();
       showMapMessage("error", err && err.message ? err.message : String(err));
     });
 }
 
 function mapShowMarkedAll() {
-  setLoading(true);
+  beginSearchLoading_();
   callGas("inventoryListMarkedProducts", {})
     .then(function(res) {
-      setLoading(false);
+      endSearchLoading_();
       if (!res || !res.ok) {
         showMapMessage("error", res && res.message ? res.message : "一覧取得に失敗しました。");
         return;
@@ -1708,7 +1747,7 @@ function mapShowMarkedAll() {
       inventoryRenderGroupedList(res.groups || [], "記入済 全ロケ商品一覧");
     })
     .catch(function(err) {
-      setLoading(false);
+      endSearchLoading_();
       showMapMessage("error", err && err.message ? err.message : String(err));
     });
 }
@@ -1716,10 +1755,10 @@ function mapShowMarkedAll() {
 function mapShowSelectedMarkedProducts() {
   if (!selectedMapLocation || !isInventoryLocationText_(selectedMapLocation)) return;
   closeMapActionSheet();
-  setLoading(true);
+  beginSearchLoading_();
   callGas("inventoryListMarkedProducts", { location: selectedMapLocation })
     .then(function(res) {
-      setLoading(false);
+      endSearchLoading_();
       if (!res || !res.ok) {
         showMapMessage("error", res && res.message ? res.message : "一覧取得に失敗しました。");
         return;
@@ -1728,7 +1767,7 @@ function mapShowSelectedMarkedProducts() {
       inventoryRenderGroupedList(res.groups || [], "記入済商品一覧：" + selectedMapLocation);
     })
     .catch(function(err) {
-      setLoading(false);
+      endSearchLoading_();
       showMapMessage("error", err && err.message ? err.message : String(err));
     });
 }
@@ -1736,10 +1775,10 @@ function mapShowSelectedMarkedProducts() {
 function mapShowSelectedAllProducts() {
   if (!selectedMapLocation || !isInventoryLocationText_(selectedMapLocation)) return;
   closeMapActionSheet();
-  setLoading(true);
+  beginSearchLoading_();
   callGas("inventoryListProductsByLocation", { location: selectedMapLocation })
     .then(function(res) {
-      setLoading(false);
+      endSearchLoading_();
       if (!res || !res.ok) {
         showMapMessage("error", res && res.message ? res.message : "一覧取得に失敗しました。");
         return;
@@ -1748,7 +1787,7 @@ function mapShowSelectedAllProducts() {
       inventoryRenderList(res.items || [], "このロケの商品一覧：" + selectedMapLocation);
     })
     .catch(function(err) {
-      setLoading(false);
+      endSearchLoading_();
       showMapMessage("error", err && err.message ? err.message : String(err));
     });
 }
@@ -1778,6 +1817,7 @@ function setupMapPinch_() {
 
   window.addEventListener("orientationchange", function() {
     setTimeout(function() {
+      if (currentMapData) renderInventoryMap(currentMapData);
       const scaleEl = document.getElementById("mapScale");
       if (scaleEl) scaleEl.style.transform = "scale(" + (mapScaleValue || 1) + ")";
     }, 300);
@@ -1792,4 +1832,10 @@ function getTouchDistance_(a, b) {
 
 document.addEventListener("DOMContentLoaded", function() {
   showMainSection("menu");
+});
+
+window.addEventListener("resize", function() {
+  if (activeSection === "map" && currentMapData) {
+    renderInventoryMap(currentMapData);
+  }
 });

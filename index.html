@@ -651,8 +651,8 @@
 
     <div class="card mainMenuCard" id="mainMenu">
       <button class="primary wide menuBtn" onclick="showMainSection('search')">① 商品検索・ロケ変更</button>
-      <button class="secondary wide menuBtn" onclick="showMainSection('inventory')">② 棚卸し記入</button>
-      <button class="secondary wide menuBtn" onclick="showMainSection('map')">③ 棚卸しマップ</button>
+      <button class="secondary wide menuBtn" onclick="openInventoryMenu()">② 棚卸し記入</button>
+      <button class="secondary wide menuBtn" onclick="openMapMenu()">③ 棚卸しマップ</button>
     </div>
 
     <div id="searchView" class="viewSection hidden">
@@ -738,19 +738,42 @@
 
     <div id="inventoryView" class="viewSection hidden">
       <div class="card">
-        <button class="secondary wide" onclick="showMainSection('menu')">🏠 トップへ戻る</button>
+        <button class="secondary wide" onclick="showMainSection('menu')">🏠 メインメニューへ戻る</button>
         <h2 class="sectionTitle">棚卸し記入</h2>
 
         <button class="primary wide" onclick="startInventoryScanner()">📷 JANスキャン</button>
 
         <div class="field" style="margin-top:14px;">
-          <label>JAN</label>
-          <input id="invJanInput" inputmode="numeric" placeholder="4901234567890">
+          <label>まとめて入力</label>
+          <textarea id="invTextInput" placeholder="例：4901234567890&#10;例：ABC 黒 23cm"></textarea>
+          <div class="small">商品検索・ロケ変更と同じ検索条件で探せます。</div>
         </div>
 
-        <div class="field">
-          <label>品番</label>
-          <input id="invHinbanInput" placeholder="品番で検索">
+        <div class="grid">
+          <div class="field">
+            <label>JAN</label>
+            <input id="invJanInput" inputmode="numeric" placeholder="4901234567890">
+          </div>
+          <div class="field">
+            <label>品番</label>
+            <input id="invHinbanInput" placeholder="ABC">
+          </div>
+          <div class="field">
+            <label>品名</label>
+            <input id="invNameInput" placeholder="商品名の一部">
+          </div>
+          <div class="field">
+            <label>カラー</label>
+            <input id="invColorInput" placeholder="黒">
+          </div>
+          <div class="field">
+            <label>サイズ</label>
+            <input id="invSizeInput" placeholder="23cm">
+          </div>
+          <div class="field">
+            <label>ロケ</label>
+            <input id="invLocationInput" placeholder="B-1">
+          </div>
         </div>
 
         <div class="btn-row">
@@ -793,7 +816,7 @@
 
     <div id="mapView" class="viewSection hidden">
       <div class="card">
-        <button class="secondary wide" onclick="showMainSection('menu')">🏠 トップへ戻る</button>
+        <button class="secondary wide" onclick="showMainSection('menu')">🏠 メインメニューへ戻る</button>
         <h2 class="sectionTitle">棚卸しマップ</h2>
 
         <div class="btn-row">
