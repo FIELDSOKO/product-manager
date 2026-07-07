@@ -483,6 +483,16 @@ button {
   -webkit-user-select: none;
 }
 
+
+.mapCellHasBorder {
+  border-style: solid;
+}
+
+.mapCellNoBorder {
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
 .mapCellBlank {
   opacity: 1;
 }
@@ -591,72 +601,3 @@ body.map-active .mapOuter {
   font-size: clamp(9px, 2.6vw, 14px);
 }
 
-.mapOverviewBack {
-  display: none;
-  position: fixed;
-  inset: 0;
-  z-index: 3200;
-  background: rgba(0,0,0,0.46);
-  padding: 14px;
-  align-items: center;
-  justify-content: center;
-}
-
-.mapOverviewBack.show {
-  display: flex;
-}
-
-.mapOverviewSheet {
-  width: min(98vw, 1120px);
-  height: min(92dvh, 760px);
-  background: #ffffff;
-  border-radius: 20px;
-  padding: 14px;
-  box-shadow: 0 20px 70px rgba(0,0,0,0.32);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.mapOverviewHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.mapOverviewOuter {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  background: #ffffff;
-  border-radius: 14px;
-  padding: 12px;
-  border: 1px solid #e5e7eb;
-}
-
-.mapOverviewGrid .mapCell {
-  pointer-events: none;
-}
-
-
-/* 全体図は通常マップと同じデータを一画面で確認しやすく表示 */
-.mapOverviewOuter {
-  overflow: hidden;
-}
-
-.mapOverviewGrid {
-  transform-origin: 0 0;
-}
-
-.mapOverviewGrid .mapCell {
-  min-width: 52px;
-  min-height: 30px;
-  font-size: 10px;
-  padding: 2px;
-}
-
-#inventoryBackToEntryBtn {
-  margin-top: 0;
-  margin-bottom: 12px;
-}

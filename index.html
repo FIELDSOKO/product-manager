@@ -831,8 +831,6 @@
           <button class="secondary" onclick="mapShowMarkedAll()">📦記入済 全ロケ商品一覧</button>
           <button class="danger" onclick="mapClearAllLocationStates()">🧹全ロケ状態クリア</button>
         </div>
-        <button class="secondary wide" onclick="openMapOverview()">全体図を見る</button>
-
         <div id="mapMessage" class="msg"></div>
       </div>
 
@@ -861,23 +859,6 @@
         <button class="secondary wide" onclick="closeMapActionSheet()">✕閉じる</button>
       </div>
     </div>
-
-    <div class="mapOverviewBack" id="mapOverviewBack" onclick="closeMapOverview()">
-      <div class="mapOverviewSheet" onclick="event.stopPropagation()">
-        <div class="mapOverviewHeader">
-          <strong id="mapOverviewTitle">棚卸しマップ 全体図</strong>
-          <button class="secondary" onclick="closeMapOverview()">閉じる</button>
-        </div>
-        <div class="btn-row">
-          <button class="primary" onclick="loadMapOverview('1F')">1階</button>
-          <button class="primary" onclick="loadMapOverview('2F')">2階</button>
-        </div>
-        <div class="mapOverviewOuter">
-          <div class="mapGrid mapOverviewGrid" id="mapOverviewGrid"></div>
-        </div>
-      </div>
-    </div>
-
 
   <div class="scanner" id="scannerBox" aria-hidden="true">
     <video id="readerVideo" playsinline muted></video>

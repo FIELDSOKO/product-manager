@@ -43,6 +43,7 @@ let selectedMapLocation = "";
 let currentMapFloor = "1F";
 let currentMapState = {};
 let mapScaleValue = 1;
+let mapMinScaleValue = 0.6;
 let mapPinchStartDistance = 0;
 let mapPinchStartScale = 1;
 let currentMapData = null;
@@ -1769,6 +1770,9 @@ function loadInventoryMap(floor) {
 function renderInventoryMap(data) {
   const grid = document.getElementById("mapGrid");
   renderInventoryMapGrid_(grid, data, false);
+  requestAnimationFrame(function() {
+    fitInventoryMapToScreen_();
+  });
 }
 
 function renderInventoryMapGrid_(grid, data, readOnly) {
@@ -1793,6 +1797,7 @@ function renderInventoryMapGrid_(grid, data, readOnly) {
     const rowspan = Number(cell.rowspan || 1);
     const colspan = Number(cell.colspan || 1);
     const style = cell.style || {};
+    const hasSpreadsheetBorder = !!(style && style.hasBorder);
 
     div.className = "mapCell " + getMapStateClass_(state);
     div.textContent = value;
@@ -1809,7 +1814,9 @@ function renderInventoryMapGrid_(grid, data, readOnly) {
       };
     } else {
       div.classList.add("mapCellBlank");
-      if (!String(value || "").trim()) div.classList.add("mapCellEmpty");
+      if (!String(value || "").trim() && !hasSpreadsheetBorder) {
+        div.classList.add("mapCellEmpty");
+      }
     }
 
     grid.appendChild(div);
@@ -1846,8 +1853,11 @@ function applyMapCellSpreadsheetStyle_(div, style, isLocation, state, value) {
     div.style.fontSize = Math.max(9, Math.min(fontSize, maxSize)) + "px";
   }
 
-  if (style.borderColor && String(value || "").trim()) {
-    div.style.borderColor = style.borderColor;
+  if (style.hasBorder) {
+    div.classList.add("mapCellHasBorder");
+    div.style.borderColor = style.borderColor || "#4b5563";
+  } else {
+    div.classList.add("mapCellNoBorder");
   }
 
   if (isLocation) {
@@ -1990,71 +2000,24 @@ function mapShowSelectedProductsByStatus(filter) {
     });
 }
 
-function openMapOverview() {
-  const back = document.getElementById("mapOverviewBack");
-  if (back) back.classList.add("show");
-  loadMapOverview(currentMapFloor || "1F");
-}
+function fitInventoryMapToScreen_() {
+  const outer = document.getElementById("mapOuter");
+  const scale = document.getElementById("mapScale");
+  const grid = document.getElementById("mapGrid");
+  if (!outer || !scale || !grid) return;
 
-function closeMapOverview() {
-  const back = document.getElementById("mapOverviewBack");
-  if (back) back.classList.remove("show");
-}
+  scale.style.transformOrigin = "0 0";
+  scale.style.transform = "scale(1)";
 
-function loadMapOverview(floor) {
-  const targetFloor = floor || currentMapFloor || "1F";
-  const title = document.getElementById("mapOverviewTitle");
-  if (title) title.textContent = "棚卸しマップ 全体図：" + (targetFloor === "2F" ? "2階" : "1階");
+  const rawW = Math.max(1, grid.scrollWidth || grid.offsetWidth || 1);
+  const rawH = Math.max(1, grid.scrollHeight || grid.offsetHeight || 1);
+  const availableW = Math.max(1, outer.clientWidth - 24);
+  const availableH = Math.max(1, outer.clientHeight - 24);
+  const nextScale = Math.min(1, availableW / rawW, availableH / rawH);
 
-  if (currentMapData && currentMapData.floor === targetFloor) {
-    renderMapOverview_(currentMapData);
-    return;
-  }
-
-  beginSearchLoading_();
-  callGas("inventoryGetMap", { floor: targetFloor, overview: "1" })
-    .then(function(res) {
-      endSearchLoading_();
-      if (!res || !res.ok) {
-        showMapMessage("error", res && res.message ? res.message : "全体図を取得できませんでした。");
-        return;
-      }
-      renderMapOverview_(res);
-    })
-    .catch(function(err) {
-      endSearchLoading_();
-      showMapMessage("error", err && err.message ? err.message : String(err));
-    });
-}
-
-function renderMapOverview_(data) {
-  const grid = document.getElementById("mapOverviewGrid");
-  const outer = grid ? grid.closest(".mapOverviewOuter") : null;
-  if (!grid) return;
-
-  grid.style.transform = "scale(1)";
-  renderInventoryMapGrid_(grid, data, true);
-
-  requestAnimationFrame(function() {
-    fitMapOverviewToScreen_(grid, outer);
-  });
-}
-
-function fitMapOverviewToScreen_(grid, outer) {
-  if (!grid || !outer) return;
-
-  grid.style.transformOrigin = "0 0";
-  grid.style.transform = "scale(1)";
-
-  const availableW = Math.max(1, outer.clientWidth - 6);
-  const availableH = Math.max(1, outer.clientHeight - 6);
-  const rawW = Math.max(1, grid.scrollWidth);
-  const rawH = Math.max(1, grid.scrollHeight);
-  const scale = Math.min(1, availableW / rawW, availableH / rawH);
-
-  grid.style.transform = "scale(" + scale + ")";
-  grid.style.width = rawW + "px";
-  grid.style.height = rawH + "px";
+  mapMinScaleValue = Math.max(0.05, nextScale);
+  mapScaleValue = mapMinScaleValue;
+  scale.style.transform = "scale(" + mapScaleValue + ")";
   outer.scrollLeft = 0;
   outer.scrollTop = 0;
 }
@@ -2077,7 +2040,7 @@ function setupMapPinch_() {
     if (e.touches && e.touches.length === 2 && mapPinchStartDistance) {
       e.preventDefault();
       const d = getTouchDistance_(e.touches[0], e.touches[1]);
-      mapScaleValue = Math.max(0.6, Math.min(3, mapPinchStartScale * (d / mapPinchStartDistance)));
+      mapScaleValue = Math.max(mapMinScaleValue || 0.05, Math.min(3, mapPinchStartScale * (d / mapPinchStartDistance)));
       scale.style.transform = "scale(" + mapScaleValue + ")";
     }
   }, { passive: false });
@@ -2085,8 +2048,6 @@ function setupMapPinch_() {
   window.addEventListener("orientationchange", function() {
     setTimeout(function() {
       if (currentMapData) renderInventoryMap(currentMapData);
-      const scaleEl = document.getElementById("mapScale");
-      if (scaleEl) scaleEl.style.transform = "scale(" + (mapScaleValue || 1) + ")";
     }, 300);
   });
 }
@@ -2104,10 +2065,5 @@ document.addEventListener("DOMContentLoaded", function() {
 window.addEventListener("resize", function() {
   if (activeSection === "map" && currentMapData) {
     renderInventoryMap(currentMapData);
-  }
-  const overviewBack = document.getElementById("mapOverviewBack");
-  const overviewGrid = document.getElementById("mapOverviewGrid");
-  if (overviewBack && overviewBack.classList.contains("show") && overviewGrid) {
-    fitMapOverviewToScreen_(overviewGrid, overviewGrid.closest(".mapOverviewOuter"));
   }
 });
