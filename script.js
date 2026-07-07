@@ -1360,6 +1360,7 @@ function isInventoryLocationText_(value) {
     .replace(/[－ー―]/g, "-")
     .toUpperCase()
     .replace(/^([A-Z]+)(\d+)$/, "$1-$2");
+  if (v === "ネット") return true;
   return /^[A-Z]{1,3}-\d{1,3}$/.test(v);
 }
 
@@ -1648,8 +1649,9 @@ function renderInventoryMap(data) {
 
     div.className = "mapCell " + getMapStateClass_(state);
     div.textContent = value;
+    const rotatedRow = cols - col - colspan + 2;
     div.style.gridColumn = portraitMap ? String(row) + " / span " + String(rowspan) : String(col) + " / span " + String(colspan);
-    div.style.gridRow = portraitMap ? String(col) + " / span " + String(colspan) : String(row) + " / span " + String(rowspan);
+    div.style.gridRow = portraitMap ? String(rotatedRow) + " / span " + String(colspan) : String(row) + " / span " + String(rowspan);
     div.title = value;
 
     if (value && isLocation) {
