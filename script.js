@@ -448,7 +448,9 @@ function backToResultList() {
 }
 
 function goTopHome() {
-  showMainSection("menu");
+  // 商品検索・ロケ変更ページ内のトップへ戻る。
+  // メインメニューへ戻る処理は showMainSection("menu") のボタンだけで行う。
+  showMainSection("search");
   clearAll();
 
   const confirmModal = document.getElementById("confirmModal");
@@ -1761,22 +1763,33 @@ function getInventoryMapLayoutSignature_(data) {
   return compactParts.join("|");
 }
 
-function renderInventoryMap(data) {
+function renderInventoryMap(data, forceLayoutRender) {
   const grid = document.getElementById("mapGrid");
-  const nextSignature = getInventoryMapLayoutSignature_(data);
-  const shouldFitWhole = !currentInventoryMapLayoutSignature_ || nextSignature !== currentInventoryMapLayoutSignature_;
 
+  data = normalizeInventoryMapResponse_(data);
+  const nextSignature = getInventoryMapLayoutSignature_(data);
+  const hasRenderedLayout = !!(grid && grid.dataset && grid.dataset.layoutSignature);
+  const sameLayout = !!currentInventoryMapLayoutSignature_ && nextSignature === currentInventoryMapLayoutSignature_;
+
+  currentMapState = (data && data.locationStates) || currentMapState || {};
+  currentMapData = data;
+
+  // ロケ状態・記入済状態だけの更新では、レイアウトDOMを作り直さない。
+  // セル幅/列幅/行高さ/grid-template は初回・階切替・レイアウト更新時だけ確定する。
+  if (!forceLayoutRender && hasRenderedLayout && sameLayout && grid.dataset.layoutSignature === nextSignature) {
+    applyInventoryMapStateOnly_(currentMapState);
+    applyInventoryMapScaleTransform_();
+    updateMapZoomLabel_();
+    return;
+  }
+
+  // renderInventoryMapGrid_ を呼ぶのは、初回描画・階切替・レイアウト更新・キャッシュ無し時だけ。
   renderInventoryMapGrid_(grid, data, false);
   currentInventoryMapLayoutSignature_ = nextSignature;
+  if (grid && grid.dataset) grid.dataset.layoutSignature = nextSignature;
 
   requestAnimationFrame(function() {
-    if (shouldFitWhole) {
-      fitInventoryMapToScreen_();
-    } else {
-      // ロケ状態更新など同じレイアウトの再描画では、倍率だけ維持してサイズを同期する。
-      updateInventoryMapScaleBoxSize_();
-      updateMapZoomLabel_();
-    }
+    fitInventoryMapToScreen_();
   });
 }
 
@@ -1798,6 +1811,32 @@ function getMapStateClass_(state) {
   if (state === "完了") return "mapStateDone";
   return "mapStateBlank";
 }
+
+
+function setInventoryMapCellStateClass_(el, state) {
+  if (!el) return;
+  el.classList.remove("mapStateBlank", "mapStateProgress", "mapStateDone");
+  el.classList.add(getMapStateClass_(state || ""));
+}
+
+function applyInventoryMapStateOnly_(stateMap) {
+  const grid = document.getElementById("mapGrid");
+  if (!grid) return false;
+
+  currentMapState = stateMap || {};
+  const cells = grid.querySelectorAll(".mapCell[data-map-location-key]");
+  if (!cells.length) return false;
+
+  Array.prototype.forEach.call(cells, function(el) {
+    const label = el.dataset.mapLocation || "";
+    const state = getInventoryMapStateForLocation_(currentMapState, label);
+    setInventoryMapCellStateClass_(el, state);
+  });
+
+  return true;
+}
+
+
 
 function openMapActionSheet(location) {
   if (!isInventoryLocationText_(location)) return;
@@ -1830,7 +1869,20 @@ function mapSetSelectedLocationState(state) {
       return;
     }
     closeMapActionSheet();
-    loadInventoryMap(currentMapFloor);
+
+    currentMapState = currentMapState || {};
+    const key = normalizeInventoryLocationKey_(selectedMapLocation);
+    if (state) {
+      currentMapState[selectedMapLocation] = state;
+      currentMapState[key] = state;
+    } else {
+      delete currentMapState[selectedMapLocation];
+      delete currentMapState[key];
+    }
+
+    if (!applyInventoryMapStateOnly_(currentMapState)) {
+      loadInventoryMap(currentMapFloor);
+    }
   }).catch(function(err) {
     endSearchLoading_();
     showMapMessage("error", err && err.message ? err.message : String(err));
@@ -1850,7 +1902,8 @@ function mapClearAllLocationStates() {
         showMapMessage("error", res && res.message ? res.message : "クリアに失敗しました。");
         return;
       }
-      loadInventoryMap(currentMapFloor);
+      currentMapState = {};
+      applyInventoryMapStateOnly_(currentMapState);
       showMapMessage("success", "全ロケ状態をクリアしました。");
     })
     .catch(function(err) {
@@ -1960,7 +2013,10 @@ function setupMapPinch_() {
 
   window.addEventListener("orientationchange", function() {
     setTimeout(function() {
-      if (currentMapData) renderInventoryMap(currentMapData);
+      if (currentMapData) {
+        // 画面回転では再描画せず、現在の元レイアウトサイズを基準に倍率だけ再計算する。
+        fitInventoryMapToScreen_();
+      }
     }, 300);
   });
 }
@@ -2003,7 +2059,8 @@ document.addEventListener("DOMContentLoaded", function() {
 
 window.addEventListener("resize", function() {
   if (activeSection === "map" && currentMapData) {
-    renderInventoryMap(currentMapData);
+    // リサイズではレイアウトDOMを作り直さず、元サイズ固定のまま倍率だけ調整する。
+    fitInventoryMapToScreen_();
   }
 });
 
@@ -2103,7 +2160,9 @@ function loadInventoryMap(floor) {
         merged.locationStates = statesRes.locationStates || {};
         currentMapState = merged.locationStates || {};
         currentMapData = merged;
-        renderInventoryMap(merged);
+        // 状態取得後はセルの色・クラスだけ更新し、レイアウト再描画はしない。
+        applyInventoryMapStateOnly_(currentMapState);
+        updateMapZoomLabel_();
       })
       .catch(function() {});
   } else {
@@ -2585,6 +2644,10 @@ function renderInventoryMapGrid_(grid, data, readOnly) {
     div.className = "mapCell " + getMapStateClass_(state);
     div.textContent = value;
     div.title = value;
+    if (isLocation) {
+      div.dataset.mapLocation = value;
+      div.dataset.mapLocationKey = normalizeInventoryLocationKey_(value);
+    }
 
     div.style.gridColumn = String(info.colStart - minCol + 1) + " / span " + String(info.colSpan);
     div.style.gridRow = String(info.rowStart - minRow + 1) + " / span " + String(info.rowSpan);
