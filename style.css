@@ -451,25 +451,30 @@ button {
 }
 
 .mapScale {
-  transform-origin: 0 0;
+  transform: none !important;
+  transform-origin: 0 0 !important;
   display: inline-block;
+  overflow: visible !important;
+  position: relative;
   transition: transform 0.08s linear;
 }
 
 .mapGrid {
   display: grid;
-  gap: 3px;
+  gap: 0 !important;
   align-items: stretch;
   justify-content: start;
   box-sizing: border-box;
+  transform-origin: 0 0 !important;
+  will-change: transform;
 }
 
 .mapCell {
-  min-width: 64px;
-  min-height: 36px;
+  min-width: 0 !important;
+  min-height: 0 !important;
   border: 1px solid #4b5563;
-  border-radius: 6px;
-  padding: 4px;
+  border-radius: 0 !important;
+  padding: 1px !important;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -482,8 +487,13 @@ button {
   word-break: break-word;
   user-select: none;
   -webkit-user-select: none;
+  overflow: hidden;
 }
 
+.mapCellAutoFit {
+  overflow: hidden;
+  font-size: clamp(9px, 2.6vw, 14px);
+}
 
 .mapCellHasBorder {
   border-style: solid;
@@ -561,6 +571,56 @@ button {
   margin: 12px 0;
 }
 
+body.map-active .app {
+  max-width: none;
+}
+
+body.map-active .mapOuter {
+  width: calc(100vw - 28px);
+  max-width: none;
+}
+
+.mapZoomControls {
+  display: grid;
+  grid-template-columns: 1fr 52px 52px minmax(96px, auto) !important;
+  gap: 8px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.mapZoomLabel {
+  font-size: 13px;
+  font-weight: 900;
+  color: #111827;
+  text-align: center;
+  background: #f3f4f6;
+  border-radius: 12px;
+  padding: 10px 8px;
+}
+
+.mapZoomControls button {
+  height: 44px !important;
+  min-height: 44px !important;
+  padding: 0 12px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  line-height: 1 !important;
+  white-space: nowrap;
+}
+
+.mapZoomControls button:nth-of-type(1),
+.mapZoomControls button:nth-of-type(2) {
+  width: 52px !important;
+  min-width: 52px !important;
+  max-width: 52px !important;
+  font-size: 20px !important;
+}
+
+.mapZoomControls button:nth-of-type(3) {
+  min-width: 96px !important;
+}
+
 @media (orientation: landscape) {
   .app {
     max-width: 960px;
@@ -571,128 +631,25 @@ button {
     min-height: 300px;
   }
 
-  .mapCell {
-    min-width: 74px;
-  }
-}
-
-
-body.map-active .app {
-  max-width: none;
-}
-
-body.map-active .mapOuter {
-  width: calc(100vw - 28px);
-  max-width: none;
-}
-
-@media (orientation: landscape) {
   body.map-active .mapOuter {
     height: calc(100dvh - 210px);
     min-height: 300px;
   }
 }
 
-
-.mapCell {
-  overflow: hidden;
-}
-
-.mapCellAutoFit {
-  font-size: clamp(9px, 2.6vw, 14px);
-}
-
-
-/* 棚卸しマップ倍率操作（既存機能へ影響しない追加） */
-.mapZoomControls {
-  display: grid;
-  grid-template-columns: 1fr auto auto auto;
-  gap: 8px;
-  align-items: center;
-  margin-top: 10px;
-}
-
-.mapZoomControls button {
-  padding: 10px 12px;
-  min-width: 46px;
-}
-
-.mapZoomLabel {
-  font-size: 13px;
-  font-weight: 900;
-  color: #111827;
-  background: #f3f4f6;
-  border-radius: 12px;
-  padding: 10px 12px;
-  text-align: center;
-}
-
-.mapCellAutoFit {
-  overflow: hidden;
-}
-
 @media (max-width: 420px) {
   .mapZoomControls {
-    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-columns: 1fr 52px 52px !important;
   }
+
   .mapZoomLabel {
     grid-column: 1 / -1;
   }
+
+  .mapZoomControls button:nth-of-type(3) {
+    grid-column: 1 / -1;
+    width: 100% !important;
+    max-width: none !important;
+  }
 }
 
-
-/* 棚卸しマップ：スプレッドシート書式反映用 */
-.mapGrid {
-  gap: 0;
-}
-
-.mapCell {
-  border-radius: 0;
-  overflow: hidden;
-}
-
-.mapZoomControls {
-  display: grid;
-  grid-template-columns: 1fr auto auto auto;
-  gap: 8px;
-  align-items: center;
-  margin-top: 10px;
-}
-
-.mapZoomLabel {
-  font-weight: 900;
-  color: #111827;
-  text-align: center;
-  background: #f3f4f6;
-  border-radius: 12px;
-  padding: 10px 8px;
-}
-
-
-/* 棚卸しマップ：スプレッドシート書式反映を優先 */
-.mapGrid {
-  gap: 0 !important;
-}
-
-.mapCell {
-  border-radius: 0;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-  padding: 2px;
-}
-
-.mapScale {
-  overflow: visible;
-}
-
-
-/* 棚卸しマップ：スプレッドシート書式をinline styleで反映するため、固定見た目を弱める */
-.mapGrid { gap: 0 !important; }
-.mapCell {
-  border-radius: 0 !important;
-  min-width: 0 !important;
-  min-height: 0 !important;
-  padding: 1px !important;
-  overflow: hidden;
-}

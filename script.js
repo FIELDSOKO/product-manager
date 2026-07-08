@@ -2190,17 +2190,65 @@ function autoFitMapCellText_(div) {
   }
 }
 
-function updateInventoryMapScaleBoxSize_() {
+function getInventoryMapBaseSize_() {
+  const scale = document.getElementById("mapScale");
+  const grid = document.getElementById("mapGrid");
+  const w = Number((scale && scale.dataset && scale.dataset.baseWidth) || (grid && grid.dataset && grid.dataset.baseWidth) || 0);
+  const h = Number((scale && scale.dataset && scale.dataset.baseHeight) || (grid && grid.dataset && grid.dataset.baseHeight) || 0);
+  if (w > 0 && h > 0) return { width: w, height: h };
+  return {
+    width: Math.max(1, grid ? (grid.scrollWidth || grid.offsetWidth || 1) : 1),
+    height: Math.max(1, grid ? (grid.scrollHeight || grid.offsetHeight || 1) : 1)
+  };
+}
+
+function setInventoryMapBaseSize_(baseWidth, baseHeight) {
+  const scale = document.getElementById("mapScale");
+  const grid = document.getElementById("mapGrid");
+  const w = Math.max(1, Math.ceil(Number(baseWidth || 1)));
+  const h = Math.max(1, Math.ceil(Number(baseHeight || 1)));
+  if (scale && scale.dataset) {
+    scale.dataset.baseWidth = String(w);
+    scale.dataset.baseHeight = String(h);
+  }
+  if (grid && grid.dataset) {
+    grid.dataset.baseWidth = String(w);
+    grid.dataset.baseHeight = String(h);
+  }
+}
+
+function clampInventoryMapScroll_() {
+  const outer = document.getElementById("mapOuter");
+  if (!outer) return;
+  const maxLeft = Math.max(0, outer.scrollWidth - outer.clientWidth);
+  const maxTop = Math.max(0, outer.scrollHeight - outer.clientHeight);
+  if (outer.scrollLeft > maxLeft) outer.scrollLeft = maxLeft;
+  if (outer.scrollTop > maxTop) outer.scrollTop = maxTop;
+}
+
+function applyInventoryMapScaleTransform_() {
   const scale = document.getElementById("mapScale");
   const grid = document.getElementById("mapGrid");
   if (!scale || !grid) return;
 
-  const rawW = Math.max(1, grid.scrollWidth || grid.offsetWidth || 1);
-  const rawH = Math.max(1, grid.scrollHeight || grid.offsetHeight || 1);
+  const base = getInventoryMapBaseSize_();
   const s = Math.max(0.01, Number(mapScaleValue || 1));
 
-  scale.style.width = Math.ceil(rawW * s) + "px";
-  scale.style.height = Math.ceil(rawH * s) + "px";
+  // grid-template-columns / rows とセル幅は基準値のまま固定し、ズームはtransformだけで行う。
+  scale.style.transform = "none";
+  scale.style.transformOrigin = "0 0";
+  scale.style.width = Math.ceil(base.width * s) + "px";
+  scale.style.height = Math.ceil(base.height * s) + "px";
+
+  grid.style.transformOrigin = "0 0";
+  grid.style.transform = "scale(" + s + ")";
+  grid.style.width = base.width + "px";
+  grid.style.height = base.height + "px";
+}
+
+function updateInventoryMapScaleBoxSize_() {
+  applyInventoryMapScaleTransform_();
+  clampInventoryMapScroll_();
 }
 
 function fitInventoryMapToScreen_() {
@@ -2209,23 +2257,19 @@ function fitInventoryMapToScreen_() {
   const grid = document.getElementById("mapGrid");
   if (!outer || !scale || !grid) return;
 
-  scale.style.transformOrigin = "0 0";
-  scale.style.transform = "scale(1)";
-  scale.style.width = "";
-  scale.style.height = "";
-
-  const rawW = Math.max(1, grid.scrollWidth || grid.offsetWidth || 1);
-  const rawH = Math.max(1, grid.scrollHeight || grid.offsetHeight || 1);
+  const base = getInventoryMapBaseSize_();
+  const rawW = Math.max(1, base.width);
+  const rawH = Math.max(1, base.height);
   const availableW = Math.max(1, outer.clientWidth - 24);
   const availableH = Math.max(1, outer.clientHeight - 24);
   const nextScale = Math.min(1, availableW / rawW, availableH / rawH);
 
   mapMinScaleValue = Math.max(0.03, nextScale);
   mapScaleValue = mapMinScaleValue;
-  scale.style.transform = "scale(" + mapScaleValue + ")";
-  updateInventoryMapScaleBoxSize_();
+  applyInventoryMapScaleTransform_();
   outer.scrollLeft = 0;
   outer.scrollTop = 0;
+  clampInventoryMapScroll_();
   updateMapZoomLabel_();
 }
 
@@ -2245,11 +2289,11 @@ function setInventoryMapScale_(nextScale, centerClientX, centerClientY) {
   const contentY = (outer.scrollTop + centerY) / oldScale;
 
   mapScaleValue = nextScale;
-  scale.style.transform = "scale(" + mapScaleValue + ")";
-  updateInventoryMapScaleBoxSize_();
+  applyInventoryMapScaleTransform_();
 
   outer.scrollLeft = Math.max(0, contentX * mapScaleValue - centerX);
   outer.scrollTop = Math.max(0, contentY * mapScaleValue - centerY);
+  clampInventoryMapScroll_();
   updateMapZoomLabel_();
 }
 
@@ -2477,6 +2521,12 @@ function renderInventoryMapGrid_(grid, data, readOnly) {
 
   grid.style.gridTemplateColumns = visibleColTracks.join(" ") || ("repeat(" + (maxCol - minCol + 1) + ", 64px)");
   grid.style.gridTemplateRows = visibleRowTracks.join(" ") || ("repeat(" + (maxRow - minRow + 1) + ", 36px)");
+
+  var baseGridWidth = visibleColTracks.reduce(function(sum, v) { return sum + (parseFloat(v) || 0); }, 0) + INVENTORY_MAP_VIEW_PADDING_PX * 2;
+  var baseGridHeight = visibleRowTracks.reduce(function(sum, v) { return sum + (parseFloat(v) || 0); }, 0) + INVENTORY_MAP_VIEW_PADDING_PX * 2;
+  if (!baseGridWidth || baseGridWidth < 1) baseGridWidth = (maxCol - minCol + 1) * 64 + INVENTORY_MAP_VIEW_PADDING_PX * 2;
+  if (!baseGridHeight || baseGridHeight < 1) baseGridHeight = (maxRow - minRow + 1) * 36 + INVENTORY_MAP_VIEW_PADDING_PX * 2;
+  setInventoryMapBaseSize_(baseGridWidth, baseGridHeight);
 
   mapped.forEach(function(info) {
     var cell = info.cell;
