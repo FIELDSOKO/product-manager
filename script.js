@@ -56,6 +56,9 @@ let currentInventoryBackButtonLabel = "記入済商品一覧へ戻る";
 const INVENTORY_MAP_VIEW_PADDING_PX = 42;
 let currentInventoryMapLayoutSignature_ = "";
 let currentInventoryMapOriginalLayoutMetrics_ = null;
+let inventoryMapStateRefreshTimer_ = null;
+let inventoryMapStateRefreshBusy_ = false;
+let inventoryMapStateRefreshFloor_ = "";
 
 function initApp_() {
   setAppVersion();
@@ -74,7 +77,14 @@ if (document.readyState === "complete") {
 
 
 function showMainSection(section) {
-  activeSection = section || "menu";
+  const nextSection = section || "menu";
+  const wasMap = activeSection === "map";
+
+  if (wasMap && nextSection !== "map") {
+    stopInventoryMapAutoRefresh_();
+  }
+
+  activeSection = nextSection;
 
   const menu = document.getElementById("mainMenu");
   const search = document.getElementById("searchView");
@@ -96,6 +106,7 @@ function showMainSection(section) {
   }
 
   if (activeSection === "map") {
+    stopInventoryMapAutoRefresh_();
     loadInventoryMap(currentMapFloor || "1F");
   }
 }
@@ -1836,7 +1847,66 @@ function applyInventoryMapStateOnly_(stateMap) {
     setInventoryMapCellStateClass_(el, state);
   });
 
+  updateOpenMapActionSheetState_();
   return true;
+}
+
+function updateOpenMapActionSheetState_() {
+  const back = document.getElementById("mapActionSheet");
+  const st = document.getElementById("mapSheetState");
+  if (!back || !st || !back.classList.contains("show") || !selectedMapLocation) return;
+  const state = getInventoryMapStateForLocation_(currentMapState, selectedMapLocation);
+  st.textContent = "現在：" + (state === "途中" ? "🟨途中" : state === "完了" ? "🟩完了" : "⬜空欄");
+}
+
+function startInventoryMapAutoRefresh_() {
+  if (activeSection !== "map") return;
+  stopInventoryMapAutoRefresh_();
+  inventoryMapStateRefreshFloor_ = currentMapFloor || "1F";
+  inventoryMapStateRefreshTimer_ = setInterval(refreshInventoryMapStateOnly_, 3000);
+}
+
+function stopInventoryMapAutoRefresh_() {
+  if (inventoryMapStateRefreshTimer_) {
+    clearInterval(inventoryMapStateRefreshTimer_);
+    inventoryMapStateRefreshTimer_ = null;
+  }
+  inventoryMapStateRefreshBusy_ = false;
+  inventoryMapStateRefreshFloor_ = "";
+}
+
+function refreshInventoryMapStateOnly_() {
+  if (activeSection !== "map") {
+    stopInventoryMapAutoRefresh_();
+    return;
+  }
+
+  if (inventoryMapStateRefreshBusy_) return;
+
+  const grid = document.getElementById("mapGrid");
+  if (!grid || !grid.dataset || !grid.dataset.layoutSignature) return;
+
+  const requestFloor = currentMapFloor || "1F";
+  inventoryMapStateRefreshBusy_ = true;
+
+  callGas("inventoryGetMapStates", { floor: requestFloor })
+    .then(function(res) {
+      if (activeSection !== "map" || currentMapFloor !== requestFloor) return;
+      if (!res || !res.ok) return;
+
+      currentMapState = res.locationStates || {};
+      if (currentMapData) currentMapData.locationStates = currentMapState;
+
+      // 3秒更新は状態だけ反映。DOM再生成・grid-template再生成・セルサイズ再計算は禁止。
+      applyInventoryMapStateOnly_(currentMapState);
+      updateMapZoomLabel_();
+    })
+    .catch(function() {
+      // 通信失敗時は現在表示を維持し、マップ再描画・レイアウト変更は行わない。
+    })
+    .then(function() {
+      inventoryMapStateRefreshBusy_ = false;
+    });
 }
 
 
@@ -1844,7 +1914,7 @@ function applyInventoryMapStateOnly_(stateMap) {
 function openMapActionSheet(location) {
   if (!isInventoryLocationText_(location)) return;
   selectedMapLocation = location || "";
-  const state = currentMapState[selectedMapLocation] || "";
+  const state = getInventoryMapStateForLocation_(currentMapState, selectedMapLocation);
   const back = document.getElementById("mapActionSheet");
   const loc = document.getElementById("mapSheetLocation");
   const st = document.getElementById("mapSheetState");
@@ -2140,6 +2210,7 @@ function loadInventoryMap(floor) {
   }
 
   const requestFloor = currentMapFloor;
+  stopInventoryMapAutoRefresh_();
   hideMapMessage();
 
   const cachedLayout = readLatestInventoryMapLayoutFromBrowserCache_(requestFloor);
@@ -2152,6 +2223,7 @@ function loadInventoryMap(floor) {
     currentMapData = cachedNormalized;
     renderInventoryMap(cachedNormalized);
     showMapMessage("info", requestFloor === "2F" ? "2階を表示中です。" : "1階を表示中です。");
+    startInventoryMapAutoRefresh_();
     showedCached = true;
     endSearchLoading_();
 
@@ -2166,6 +2238,7 @@ function loadInventoryMap(floor) {
         // 状態取得後はセルの色・クラスだけ更新し、レイアウト再描画はしない。
         applyInventoryMapStateOnly_(currentMapState);
         updateMapZoomLabel_();
+        startInventoryMapAutoRefresh_();
       })
       .catch(function() {});
   } else {
@@ -2222,6 +2295,7 @@ function loadInventoryMap(floor) {
       currentMapData = normalized;
       renderInventoryMap(normalized);
       showMapMessage("info", requestFloor === "2F" ? "2階を表示中です。" : "1階を表示中です。");
+      startInventoryMapAutoRefresh_();
     })
     .catch(function(err) {
       if (currentMapFloor !== requestFloor) return;
@@ -2313,6 +2387,8 @@ function setInventoryMapBaseSize_(baseWidth, baseHeight, gridTemplateColumns, gr
     originalGridTemplateRows: String(gridTemplateRows || (grid && grid.style ? grid.style.gridTemplateRows : "") || ""),
     originalCellWidths: (cellWidths || []).slice ? (cellWidths || []).slice() : [],
     originalCellHeights: (cellHeights || []).slice ? (cellHeights || []).slice() : [],
+    originalGridWidth: w,
+    originalGridHeight: h,
     baseWidth: w,
     baseHeight: h
   };
@@ -2326,6 +2402,10 @@ function setInventoryMapBaseSize_(baseWidth, baseHeight, gridTemplateColumns, gr
     grid.dataset.baseHeight = String(h);
     grid.dataset.originalGridTemplateColumns = currentInventoryMapOriginalLayoutMetrics_.originalGridTemplateColumns;
     grid.dataset.originalGridTemplateRows = currentInventoryMapOriginalLayoutMetrics_.originalGridTemplateRows;
+    grid.dataset.originalGridWidth = String(w);
+    grid.dataset.originalGridHeight = String(h);
+    grid.dataset.originalCellWidths = JSON.stringify(currentInventoryMapOriginalLayoutMetrics_.originalCellWidths);
+    grid.dataset.originalCellHeights = JSON.stringify(currentInventoryMapOriginalLayoutMetrics_.originalCellHeights);
   }
 
   // 元サイズは描画時だけ確定。ズーム・状態更新ではこの値を絶対に書き換えない。
