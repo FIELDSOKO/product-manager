@@ -461,6 +461,7 @@ button {
   gap: 3px;
   align-items: stretch;
   justify-content: start;
+  box-sizing: border-box;
 }
 
 .mapCell {
