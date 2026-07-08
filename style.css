@@ -638,3 +638,60 @@ body.map-active .mapOuter {
     grid-column: 1 / -1;
   }
 }
+
+
+/* 棚卸しマップ：スプレッドシート書式反映用 */
+.mapGrid {
+  gap: 0;
+}
+
+.mapCell {
+  border-radius: 0;
+  overflow: hidden;
+}
+
+.mapZoomControls {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 8px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.mapZoomLabel {
+  font-weight: 900;
+  color: #111827;
+  text-align: center;
+  background: #f3f4f6;
+  border-radius: 12px;
+  padding: 10px 8px;
+}
+
+
+/* 棚卸しマップ：スプレッドシート書式反映を優先 */
+.mapGrid {
+  gap: 0 !important;
+}
+
+.mapCell {
+  border-radius: 0;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  padding: 2px;
+}
+
+.mapScale {
+  overflow: visible;
+}
+
+
+/* 棚卸しマップ：スプレッドシート書式をinline styleで反映するため、固定見た目を弱める */
+.mapGrid { gap: 0 !important; }
+.mapCell {
+  border-radius: 0 !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  padding: 1px !important;
+  overflow: hidden;
+}

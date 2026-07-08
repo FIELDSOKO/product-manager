@@ -1039,11 +1039,7 @@ function setupScannerTouchEvents_() {
   }, { passive: true });
 }
 
-function getTouchDistance_(a, b) {
-  const dx = a.clientX - b.clientX;
-  const dy = a.clientY - b.clientY;
-  return Math.sqrt(dx * dx + dy * dy);
-}
+
 
 function requestTapFocus_(clientX, clientY) {
   const mark = document.getElementById("focusMark");
@@ -1368,7 +1364,7 @@ function isInventoryLocationText_(value) {
     .normalize("NFKC")
     .trim()
     .replace(/\s+/g, "")
-    .replace(/[－ー―]/g, "-")
+    .replace(/[‐‑‒–—―ー－−﹣－\-]+/g, "-")
     .toUpperCase()
     .replace(/^([A-Z]+)(\d+)$/, "$1-$2");
   if (v === "ネット") return true;
@@ -1746,28 +1742,7 @@ function inventoryRenderGroupedList(groups, title) {
   card.classList.remove("hidden");
 }
 
-function loadInventoryMap(floor) {
-  currentMapFloor = floor || currentMapFloor || "1F";
-  hideMapMessage();
 
-  beginSearchLoading_();
-  callGas("inventoryGetMap", { floor: currentMapFloor })
-    .then(function(res) {
-      endSearchLoading_();
-      if (!res || !res.ok) {
-        showMapMessage("error", res && res.message ? res.message : "マップを取得できませんでした。");
-        return;
-      }
-      currentMapState = res.locationStates || {};
-      currentMapData = res;
-      renderInventoryMap(res);
-      showMapMessage("info", currentMapFloor === "2F" ? "2階を表示中です。" : "1階を表示中です。");
-    })
-    .catch(function(err) {
-      endSearchLoading_();
-      showMapMessage("error", err && err.message ? err.message : String(err));
-    });
-}
 
 function renderInventoryMap(data) {
   const grid = document.getElementById("mapGrid");
@@ -1777,130 +1752,13 @@ function renderInventoryMap(data) {
   });
 }
 
-function renderInventoryMapGrid_(grid, data, readOnly) {
-  if (!grid) return;
 
-  const stateMap = (data && data.locationStates) || currentMapState || {};
-  const rows = Number(data.rows || 1);
-  const cols = Number(data.cols || 1);
-  const portraitMap = shouldUsePortraitMapLayout_();
-  grid.innerHTML = "";
-  grid.style.gridTemplateColumns = "repeat(" + (portraitMap ? rows : cols) + ", minmax(64px, 88px))";
-  grid.style.gridTemplateRows = "repeat(" + (portraitMap ? cols : rows) + ", minmax(36px, 44px))";
 
-  const cells = data.cells || [];
-  cells.forEach(function(cell) {
-    const div = document.createElement("div");
-    const value = cell.value || "";
-    const isLocation = !!cell.isLocation || isInventoryLocationText_(value);
-    const state = isLocation ? (stateMap[value] || "") : "";
-    const row = Number(cell.row || 1);
-    const col = Number(cell.col || 1);
-    const rowspan = Number(cell.rowspan || 1);
-    const colspan = Number(cell.colspan || 1);
-    const style = cell.style || {};
-    const hasSpreadsheetBorder = !!(style && style.hasBorder);
 
-    div.className = "mapCell " + getMapStateClass_(state);
-    div.textContent = value;
-    const rotatedRow = cols - col - colspan + 2;
-    div.style.gridColumn = portraitMap ? String(row) + " / span " + String(rowspan) : String(col) + " / span " + String(colspan);
-    div.style.gridRow = portraitMap ? String(rotatedRow) + " / span " + String(colspan) : String(row) + " / span " + String(rowspan);
-    div.title = value;
 
-    applyMapCellSpreadsheetStyle_(div, style, isLocation, state, value);
 
-    if (!readOnly && value && isLocation) {
-      div.onclick = function() {
-        openMapActionSheet(value);
-      };
-    } else {
-      div.classList.add("mapCellBlank");
-      if (!String(value || "").trim() && !hasSpreadsheetBorder) {
-        div.classList.add("mapCellEmpty");
-      }
-    }
 
-    grid.appendChild(div);
-    autoFitMapCellText_(div);
-  });
 
-  setupMapPinch_();
-}
-
-function applyMapCellSpreadsheetStyle_(div, style, isLocation, state, value) {
-  style = style || {};
-
-  if (!isLocation && style.background) {
-    div.style.backgroundColor = style.background;
-  }
-
-  if (style.fontColor) {
-    div.style.color = style.fontColor;
-  }
-
-  if (isLocation || !style.fontColor) {
-    div.style.color = "#000000";
-  }
-
-  if (style.fontWeight) {
-    div.style.fontWeight = String(style.fontWeight).toLowerCase() === "bold" ? "950" : "900";
-  } else {
-    div.style.fontWeight = "950";
-  }
-
-  const fontSize = Number(style.fontSize || 12);
-  if (fontSize) {
-    div.style.fontSize = Math.max(8, Math.min(fontSize, 30)) + "px";
-  }
-
-  applyMapCellBorderStyle_(div, style);
-
-  if (isLocation) {
-    div.classList.add("mapCellAutoFit");
-  }
-}
-
-function autoFitMapCellText_(div) {
-  if (!div || !String(div.textContent || "").trim()) return;
-
-  let size = parseFloat(div.style.fontSize || "12") || 12;
-  const minSize = 8;
-
-  // DOM配置直後に、セル内へ収まらない場合だけ段階的に縮小する。
-  while (size > minSize && (div.scrollWidth > div.clientWidth + 1 || div.scrollHeight > div.clientHeight + 1)) {
-    size -= 1;
-    div.style.fontSize = size + "px";
-  }
-}
-
-function applyMapCellBorderStyle_(div, style) {
-  const borders = style && style.borders ? style.borders : null;
-
-  if (borders) {
-    ["top", "right", "bottom", "left"].forEach(function(side) {
-      const border = borders[side] || {};
-      const prop = side.charAt(0).toUpperCase() + side.slice(1);
-
-      if (border.visible) {
-        div.style["border" + prop + "Style"] = "solid";
-        div.style["border" + prop + "Width"] = String(border.width || 1) + "px";
-        div.style["border" + prop + "Color"] = border.color || style.borderColor || "#4b5563";
-      } else {
-        div.style["border" + prop + "Style"] = "solid";
-        div.style["border" + prop + "Width"] = "0px";
-        div.style["border" + prop + "Color"] = "transparent";
-      }
-    });
-  }
-
-  if (style.hasBorder) {
-    div.classList.add("mapCellHasBorder");
-    if (!borders) div.style.borderColor = style.borderColor || "#4b5563";
-  } else {
-    div.classList.add("mapCellNoBorder");
-  }
-}
 
 function shouldUsePortraitMapLayout_() {
   return window.innerHeight > window.innerWidth;
@@ -2037,28 +1895,7 @@ function mapShowSelectedProductsByStatus(filter) {
     });
 }
 
-function fitInventoryMapToScreen_() {
-  const outer = document.getElementById("mapOuter");
-  const scale = document.getElementById("mapScale");
-  const grid = document.getElementById("mapGrid");
-  if (!outer || !scale || !grid) return;
 
-  scale.style.transformOrigin = "0 0";
-  scale.style.transform = "scale(1)";
-
-  const rawW = Math.max(1, grid.scrollWidth || grid.offsetWidth || 1);
-  const rawH = Math.max(1, grid.scrollHeight || grid.offsetHeight || 1);
-  const availableW = Math.max(1, outer.clientWidth - 24);
-  const availableH = Math.max(1, outer.clientHeight - 24);
-  const nextScale = Math.min(1, availableW / rawW, availableH / rawH);
-
-  mapMinScaleValue = Math.max(0.05, nextScale);
-  mapScaleValue = mapMinScaleValue;
-  scale.style.transform = "scale(" + mapScaleValue + ")";
-  outer.scrollLeft = 0;
-  outer.scrollTop = 0;
-  updateMapZoomLabel_();
-}
 
 function setupMapPinch_() {
   const outer = document.getElementById("mapOuter");
@@ -2099,28 +1936,7 @@ function setupMapPinch_() {
   });
 }
 
-function setInventoryMapScale_(nextScale, centerClientX, centerClientY) {
-  const outer = document.getElementById("mapOuter");
-  const scale = document.getElementById("mapScale");
-  if (!outer || !scale) return;
 
-  const oldScale = mapScaleValue || 1;
-  nextScale = Math.max(mapMinScaleValue || 0.05, Math.min(4, Number(nextScale || oldScale)));
-
-  const rect = outer.getBoundingClientRect();
-  const centerX = Number.isFinite(centerClientX) ? centerClientX - rect.left : outer.clientWidth / 2;
-  const centerY = Number.isFinite(centerClientY) ? centerClientY - rect.top : outer.clientHeight / 2;
-
-  const contentX = (outer.scrollLeft + centerX) / oldScale;
-  const contentY = (outer.scrollTop + centerY) / oldScale;
-
-  mapScaleValue = nextScale;
-  scale.style.transform = "scale(" + mapScaleValue + ")";
-
-  outer.scrollLeft = Math.max(0, contentX * mapScaleValue - centerX);
-  outer.scrollTop = Math.max(0, contentY * mapScaleValue - centerY);
-  updateMapZoomLabel_();
-}
 
 function updateMapZoomLabel_() {
   const el = document.getElementById("mapZoomLabel");
@@ -2161,3 +1977,463 @@ window.addEventListener("resize", function() {
     renderInventoryMap(currentMapData);
   }
 });
+
+
+
+/****************************************************
+ * 棚卸しマップ レイアウトキャッシュ + 圧縮データ展開
+ * 既存機能を維持し、レイアウトだけブラウザキャッシュ。
+ * ロケ状態は毎回Apps Scriptから取得。
+ ****************************************************/
+
+
+
+function readInventoryMapLayoutFromBrowserCache_(floor, version) {
+  try {
+    const key = getInventoryMapCacheKey_(floor, version);
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (!data || String(data.layoutVersion || "") !== String(version || "")) return null;
+    return data;
+  } catch (e) {
+    return null;
+  }
+}
+
+function writeInventoryMapLayoutToBrowserCache_(floor, version, data) {
+  try {
+    const key = getInventoryMapCacheKey_(floor, version);
+    localStorage.setItem(key, JSON.stringify(data));
+    localStorage.setItem("inventoryMapLayoutLatest:" + String(floor || "1F"), key);
+  } catch (e) {}
+}
+
+
+
+function expandInventoryMapBorders_(borders) {
+  if (!borders) return null;
+
+  const sides = ["top", "right", "bottom", "left"];
+  const out = {};
+  sides.forEach(function(side, i) {
+    const b = borders[i] || [0];
+    out[side] = {
+      visible: !!b[0],
+      width: Number(b[1] || 0),
+      color: b[2] || "",
+      style: b[3] || ""
+    };
+  });
+  return out;
+}
+
+function loadInventoryMap(floor) {
+  currentMapFloor = floor || currentMapFloor || "1F";
+  hideMapMessage();
+
+  beginSearchLoading_();
+
+  callGas("inventoryGetMapMeta", { floor: currentMapFloor })
+    .then(function(meta) {
+      if (!meta || !meta.ok || !meta.layoutVersion) {
+        return callGas("inventoryGetMap", { floor: currentMapFloor, compact: "1", __timeoutMs: 60000 })
+          .then(function(fullRes) {
+            const normalized = normalizeInventoryMapResponse_(fullRes);
+            if (normalized && normalized.ok && normalized.layoutVersion) {
+              const layoutOnly = Object.assign({}, normalized);
+              delete layoutOnly.locationStates;
+              writeInventoryMapLayoutToBrowserCache_(currentMapFloor, normalized.layoutVersion, layoutOnly);
+            }
+            return normalized;
+          });
+      }
+
+      const cachedLayout = readInventoryMapLayoutFromBrowserCache_(currentMapFloor, meta.layoutVersion);
+      if (cachedLayout) {
+        return callGas("inventoryGetMapStates", { floor: currentMapFloor })
+          .then(function(statesRes) {
+            if (!statesRes || !statesRes.ok) {
+              const fallback = Object.assign({}, cachedLayout);
+              fallback.locationStates = {};
+              return fallback;
+            }
+            const merged = Object.assign({}, cachedLayout);
+            merged.locationStates = statesRes.locationStates || {};
+            return merged;
+          });
+      }
+
+      return callGas("inventoryGetMap", { floor: currentMapFloor, compact: "1", __timeoutMs: 60000 })
+        .then(function(fullRes) {
+          const normalized = normalizeInventoryMapResponse_(fullRes);
+          if (normalized && normalized.ok && normalized.layoutVersion) {
+            const layoutOnly = Object.assign({}, normalized);
+            delete layoutOnly.locationStates;
+            writeInventoryMapLayoutToBrowserCache_(currentMapFloor, normalized.layoutVersion, layoutOnly);
+          }
+          return normalized;
+        });
+    })
+    .then(function(res) {
+      endSearchLoading_();
+
+      if (!res || !res.ok) {
+        showMapMessage("error", res && res.message ? res.message : "マップを取得できませんでした。");
+        return;
+      }
+
+      const normalized = normalizeInventoryMapResponse_(res);
+      currentMapState = normalized.locationStates || {};
+      currentMapData = normalized;
+      renderInventoryMap(normalized);
+      showMapMessage("info", currentMapFloor === "2F" ? "2階を表示中です。" : "1階を表示中です。");
+    })
+    .catch(function(err) {
+      endSearchLoading_();
+      showMapMessage("error", err && err.message ? err.message : String(err));
+    });
+}
+
+
+
+
+
+
+/****************************************************
+ * 棚卸しマップ 実表示反映 最終補正
+ * ・取得済み書式をDOM/CSSへ必ず反映
+ * ・transform縮小時の右/下余白を抑えるため、ラッパー寸法も倍率に同期
+ * ・既存の検索/JAN/ロケ変更処理は変更しない
+ ****************************************************/
+
+
+
+
+
+
+
+
+
+
+
+function getMapCssBorderStyle_(sheetStyle) {
+  const s = String(sheetStyle || "").toUpperCase();
+  if (s === "DASHED") return "dashed";
+  if (s === "DOTTED") return "dotted";
+  if (s === "DOUBLE") return "double";
+  return "solid";
+}
+
+
+
+function autoFitMapCellText_(div) {
+  if (!div || !String(div.textContent || "").trim()) return;
+
+  let size = parseFloat(div.style.fontSize || "16") || 16;
+  const minSize = 7;
+
+  // シートの文字サイズをまず反映し、セルからはみ出す場合だけ縮小する。
+  let guard = 0;
+  while (size > minSize && guard < 40 && (div.scrollWidth > div.clientWidth + 1 || div.scrollHeight > div.clientHeight + 1)) {
+    size -= 1;
+    div.style.setProperty("font-size", size + "px", "important");
+    guard++;
+  }
+}
+
+function updateInventoryMapScaleBoxSize_() {
+  const scale = document.getElementById("mapScale");
+  const grid = document.getElementById("mapGrid");
+  if (!scale || !grid) return;
+
+  const rawW = Math.max(1, grid.scrollWidth || grid.offsetWidth || 1);
+  const rawH = Math.max(1, grid.scrollHeight || grid.offsetHeight || 1);
+  const s = Math.max(0.01, Number(mapScaleValue || 1));
+
+  scale.style.width = Math.ceil(rawW * s) + "px";
+  scale.style.height = Math.ceil(rawH * s) + "px";
+}
+
+function fitInventoryMapToScreen_() {
+  const outer = document.getElementById("mapOuter");
+  const scale = document.getElementById("mapScale");
+  const grid = document.getElementById("mapGrid");
+  if (!outer || !scale || !grid) return;
+
+  scale.style.transformOrigin = "0 0";
+  scale.style.transform = "scale(1)";
+  scale.style.width = "";
+  scale.style.height = "";
+
+  const rawW = Math.max(1, grid.scrollWidth || grid.offsetWidth || 1);
+  const rawH = Math.max(1, grid.scrollHeight || grid.offsetHeight || 1);
+  const availableW = Math.max(1, outer.clientWidth - 24);
+  const availableH = Math.max(1, outer.clientHeight - 24);
+  const nextScale = Math.min(1, availableW / rawW, availableH / rawH);
+
+  mapMinScaleValue = Math.max(0.03, nextScale);
+  mapScaleValue = mapMinScaleValue;
+  scale.style.transform = "scale(" + mapScaleValue + ")";
+  updateInventoryMapScaleBoxSize_();
+  outer.scrollLeft = 0;
+  outer.scrollTop = 0;
+  updateMapZoomLabel_();
+}
+
+function setInventoryMapScale_(nextScale, centerClientX, centerClientY) {
+  const outer = document.getElementById("mapOuter");
+  const scale = document.getElementById("mapScale");
+  if (!outer || !scale) return;
+
+  const oldScale = mapScaleValue || 1;
+  nextScale = Math.max(mapMinScaleValue || 0.03, Math.min(4, Number(nextScale || oldScale)));
+
+  const rect = outer.getBoundingClientRect();
+  const centerX = Number.isFinite(centerClientX) ? centerClientX - rect.left : outer.clientWidth / 2;
+  const centerY = Number.isFinite(centerClientY) ? centerClientY - rect.top : outer.clientHeight / 2;
+
+  const contentX = (outer.scrollLeft + centerX) / oldScale;
+  const contentY = (outer.scrollTop + centerY) / oldScale;
+
+  mapScaleValue = nextScale;
+  scale.style.transform = "scale(" + mapScaleValue + ")";
+  updateInventoryMapScaleBoxSize_();
+
+  outer.scrollLeft = Math.max(0, contentX * mapScaleValue - centerX);
+  outer.scrollTop = Math.max(0, contentY * mapScaleValue - centerY);
+  updateMapZoomLabel_();
+}
+
+
+/****************************************************
+ * 棚卸しマップ 書式反映・余白・ロケ状態 正規化 最終補正
+ * 既存の検索/JAN/ロケ変更処理には触れない。
+ ****************************************************/
+
+function normalizeInventoryLocationKey_(value) {
+  var v = String(value || "")
+    .normalize("NFKC")
+    .trim()
+    .replace(/[\u00A0\u3000]/g, " ")
+    .replace(/[‐‑‒–—―ー－−﹣－\-]+/g, "-")
+    .replace(/\s*-\s*/g, "-")
+    .replace(/\s+/g, " ")
+    .toUpperCase();
+
+  var compact = v.replace(/\s+/g, "");
+  var m = compact.match(/^([A-Z]+)-?(\d+)$/);
+  if (m) return m[1] + "-" + m[2];
+  return v;
+}
+
+function getInventoryMapStateForLocation_(stateMap, value) {
+  stateMap = stateMap || {};
+  var raw = String(value || "");
+  var normalized = normalizeInventoryLocationKey_(raw);
+  return stateMap[raw] || stateMap[normalized] || stateMap[raw.trim()] || "";
+}
+
+function getInventoryMapCacheKey_(floor, version) {
+  return "inventoryMapLayout:v6:" + String(floor || "1F") + ":" + String(version || "");
+}
+
+function normalizeInventoryMapResponse_(res) {
+  if (!res || !res.ok) return res;
+
+  if (!res.compact) {
+    res.layoutVersion = res.layoutVersion || res.v || "";
+    return res;
+  }
+
+  var styles = (res.st || []).map(function(s) {
+    var b = s && s[6] ? s[6] : null;
+    return {
+      background: s && s[0] ? s[0] : "",
+      fontColor: s && s[1] ? s[1] : "",
+      fontWeight: s && s[2] ? s[2] : "",
+      fontSize: s && s[3] ? s[3] : "",
+      hasBorder: !!(s && s[4]),
+      borderColor: s && s[5] ? s[5] : "",
+      borders: expandInventoryMapBorders_(b)
+    };
+  });
+
+  var cells = (res.ce || []).map(function(c) {
+    var styleIndex = Number(c[6] || 0);
+    return {
+      row: Number(c[0] || 1),
+      col: Number(c[1] || 1),
+      rowspan: Number(c[2] || 1),
+      colspan: Number(c[3] || 1),
+      value: c[4] || "",
+      isLocation: !!c[5],
+      style: styles[styleIndex] || {}
+    };
+  });
+
+  return {
+    ok: true,
+    status: res.status || "ok",
+    floor: res.f || res.floor || currentMapFloor || "1F",
+    sheetName: res.sn || res.sheetName || "",
+    layoutVersion: res.v || res.layoutVersion || "",
+    rows: Number(res.r || res.rows || 1),
+    cols: Number(res.c || res.cols || 1),
+    originalRows: Number(res.or || res.originalRows || 1),
+    originalCols: Number(res.oc || res.originalCols || 1),
+    rowHeights: res.rh || res.rowHeights || [],
+    colWidths: res.cw || res.colWidths || [],
+    cells: cells,
+    locationStates: res.locationStates || {}
+  };
+}
+
+function isMapStyleWhite_(color) {
+  var c = String(color || "").trim().toLowerCase().replace(/\s+/g, "");
+  return !c || c === "#fff" || c === "#ffffff" || c === "white" || c === "rgb(255,255,255)";
+}
+
+function getMapCssSizePx_(value, fallback, minValue) {
+  var n = Number(value || fallback || 0);
+  if (!isFinite(n) || n <= 0) return Math.max(minValue || 1, Number(fallback || minValue || 1));
+  return Math.max(minValue || 1, Math.round(n));
+}
+
+function getMapCssFontPxFromSheetPt_(pt) {
+  var n = Number(pt || 12);
+  if (!isFinite(n) || n <= 0) return 16;
+  // Google SheetsのptをブラウザCSS pxへ変換。20ptなら約27pxで表示される。
+  return Math.max(8, Math.min(96, Math.round(n * 1.333)));
+}
+
+function renderInventoryMapGrid_(grid, data, readOnly) {
+  if (!grid) return;
+
+  data = normalizeInventoryMapResponse_(data);
+  var stateMap = (data && data.locationStates) || currentMapState || {};
+  var rows = Number(data.rows || 1);
+  var cols = Number(data.cols || 1);
+  var rowHeights = data.rowHeights || [];
+  var colWidths = data.colWidths || [];
+  var portraitMap = shouldUsePortraitMapLayout_();
+
+  grid.innerHTML = "";
+  grid.style.gap = "0px";
+  grid.style.alignItems = "stretch";
+  grid.style.justifyContent = "start";
+
+  if (portraitMap) {
+    grid.style.gridTemplateColumns = rowHeights.slice(0, rows).map(function(h) {
+      return getMapCssSizePx_(h, 36, 8) + "px";
+    }).join(" ") || ("repeat(" + rows + ", 36px)");
+    grid.style.gridTemplateRows = colWidths.slice(0, cols).reverse().map(function(w) {
+      return getMapCssSizePx_(w, 64, 8) + "px";
+    }).join(" ") || ("repeat(" + cols + ", 64px)");
+  } else {
+    grid.style.gridTemplateColumns = colWidths.slice(0, cols).map(function(w) {
+      return getMapCssSizePx_(w, 64, 8) + "px";
+    }).join(" ") || ("repeat(" + cols + ", 64px)");
+    grid.style.gridTemplateRows = rowHeights.slice(0, rows).map(function(h) {
+      return getMapCssSizePx_(h, 36, 8) + "px";
+    }).join(" ") || ("repeat(" + rows + ", 36px)");
+  }
+
+  (data.cells || []).forEach(function(cell) {
+    var div = document.createElement("div");
+    var value = cell.value || "";
+    var isLocation = !!cell.isLocation || isInventoryLocationText_(value);
+    var state = isLocation ? getInventoryMapStateForLocation_(stateMap, value) : "";
+    var row = Number(cell.row || 1);
+    var col = Number(cell.col || 1);
+    var rowspan = Number(cell.rowspan || 1);
+    var colspan = Number(cell.colspan || 1);
+    var style = cell.style || {};
+    var hasSpreadsheetBorder = !!(style && style.hasBorder);
+    var hasVisibleBackground = !!(style && style.background && !isMapStyleWhite_(style.background));
+
+    div.className = "mapCell " + getMapStateClass_(state);
+    div.textContent = value;
+    div.title = value;
+
+    var rotatedRow = cols - col - colspan + 2;
+    div.style.gridColumn = portraitMap ? (String(row) + " / span " + String(rowspan)) : (String(col) + " / span " + String(colspan));
+    div.style.gridRow = portraitMap ? (String(rotatedRow) + " / span " + String(colspan)) : (String(row) + " / span " + String(rowspan));
+
+    applyMapCellSpreadsheetStyle_(div, style, isLocation, state, value);
+
+    if (!readOnly && value && isLocation) {
+      div.onclick = function() { openMapActionSheet(value); };
+    } else {
+      div.classList.add("mapCellBlank");
+      if (!String(value || "").trim() && !hasSpreadsheetBorder && !hasVisibleBackground && !(rowspan > 1 || colspan > 1)) {
+        div.classList.add("mapCellEmpty");
+      }
+    }
+
+    grid.appendChild(div);
+  });
+
+  requestAnimationFrame(function() {
+    Array.prototype.forEach.call(grid.querySelectorAll(".mapCell"), autoFitMapCellText_);
+    updateInventoryMapScaleBoxSize_();
+  });
+
+  setupMapPinch_();
+}
+
+function applyMapCellSpreadsheetStyle_(div, style, isLocation, state, value) {
+  style = style || {};
+
+  // ロケセルは状態色を優先。その他のセルはスプレッドシート背景色を実反映。
+  if (!isLocation && style.background) {
+    div.style.setProperty("background-color", style.background, "important");
+  }
+
+  var color = style.fontColor || "#000000";
+  if (isLocation) color = "#000000";
+  div.style.setProperty("color", color, "important");
+
+  var weight = String(style.fontWeight || "").toLowerCase() === "bold" ? "950" : "900";
+  div.style.setProperty("font-weight", weight, "important");
+
+  var fontPx = getMapCssFontPxFromSheetPt_(style.fontSize || 12);
+  div.style.setProperty("font-size", fontPx + "px", "important");
+  div.style.setProperty("line-height", "1.05", "important");
+  div.style.setProperty("min-width", "0", "important");
+  div.style.setProperty("min-height", "0", "important");
+  div.style.setProperty("border-radius", "0", "important");
+  div.style.setProperty("padding", "1px", "important");
+
+  applyMapCellBorderStyle_(div, style);
+}
+
+function applyMapCellBorderStyle_(div, style) {
+  style = style || {};
+  var borders = style && style.borders ? style.borders : null;
+
+  ["top", "right", "bottom", "left"].forEach(function(side) {
+    var border = borders ? (borders[side] || {}) : null;
+
+    if (border && border.visible) {
+      div.style.setProperty("border-" + side + "-style", getMapCssBorderStyle_(border.style), "important");
+      div.style.setProperty("border-" + side + "-width", String(border.width || 1) + "px", "important");
+      div.style.setProperty("border-" + side + "-color", border.color || style.borderColor || "#4b5563", "important");
+    } else if (borders) {
+      div.style.setProperty("border-" + side + "-style", "solid", "important");
+      div.style.setProperty("border-" + side + "-width", "0px", "important");
+      div.style.setProperty("border-" + side + "-color", "transparent", "important");
+    } else if (style.hasBorder) {
+      div.style.setProperty("border-" + side + "-style", "solid", "important");
+      div.style.setProperty("border-" + side + "-width", "1px", "important");
+      div.style.setProperty("border-" + side + "-color", style.borderColor || "#4b5563", "important");
+    } else {
+      div.style.setProperty("border-" + side + "-style", "solid", "important");
+      div.style.setProperty("border-" + side + "-width", "0px", "important");
+      div.style.setProperty("border-" + side + "-color", "transparent", "important");
+    }
+  });
+
+  div.classList.toggle("mapCellHasBorder", !!style.hasBorder);
+  div.classList.toggle("mapCellNoBorder", !style.hasBorder);
+}
