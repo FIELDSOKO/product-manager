@@ -1762,7 +1762,8 @@ function renderInventoryMap(data) {
 
 
 function shouldUsePortraitMapLayout_() {
-  return window.innerHeight > window.innerWidth;
+  // 棚卸しマップはスマホ縦/横・PC・再描画時でも常に現在採用中の90度向きを維持する。
+  return true;
 }
 
 function getMapStateClass_(state) {
@@ -2044,23 +2045,32 @@ function expandInventoryMapBorders_(borders) {
 }
 
 function loadInventoryMap(floor) {
-  currentMapFloor = floor || currentMapFloor || "1F";
+  var requestedFloor = String(floor || "").toUpperCase();
+  if (requestedFloor === "1F" || requestedFloor === "2F") {
+    currentMapFloor = requestedFloor;
+  } else {
+    currentMapFloor = currentMapFloor || "1F";
+  }
+
+  const requestFloor = currentMapFloor;
   hideMapMessage();
 
-  const cachedLayout = readLatestInventoryMapLayoutFromBrowserCache_(currentMapFloor);
+  const cachedLayout = readLatestInventoryMapLayoutFromBrowserCache_(requestFloor);
   let showedCached = false;
 
   if (cachedLayout) {
     const cachedNormalized = normalizeInventoryMapResponse_(Object.assign({}, cachedLayout));
+    cachedNormalized.floor = requestFloor;
     cachedNormalized.locationStates = currentMapState || {};
     currentMapData = cachedNormalized;
     renderInventoryMap(cachedNormalized);
-    showMapMessage("info", currentMapFloor === "2F" ? "2階を表示中です。" : "1階を表示中です。");
+    showMapMessage("info", requestFloor === "2F" ? "2階を表示中です。" : "1階を表示中です。");
     showedCached = true;
     endSearchLoading_();
 
-    callGas("inventoryGetMapStates", { floor: currentMapFloor })
+    callGas("inventoryGetMapStates", { floor: requestFloor })
       .then(function(statesRes) {
+        if (currentMapFloor !== requestFloor) return;
         if (!statesRes || !statesRes.ok) return;
         const merged = Object.assign({}, cachedNormalized);
         merged.locationStates = statesRes.locationStates || {};
@@ -2073,35 +2083,42 @@ function loadInventoryMap(floor) {
     beginSearchLoading_();
   }
 
-  callGas("inventoryGetMapMeta", { floor: currentMapFloor })
+  callGas("inventoryGetMapMeta", { floor: requestFloor })
     .then(function(meta) {
+      if (currentMapFloor !== requestFloor) return null;
+
       if (meta && meta.ok && meta.layoutVersion) {
-        const exactCached = readInventoryMapLayoutFromBrowserCache_(currentMapFloor, meta.layoutVersion);
+        const exactCached = readInventoryMapLayoutFromBrowserCache_(requestFloor, meta.layoutVersion);
         if (exactCached) {
           if (showedCached) return null;
 
-          return callGas("inventoryGetMapStates", { floor: currentMapFloor })
+          return callGas("inventoryGetMapStates", { floor: requestFloor })
             .then(function(statesRes) {
+              if (currentMapFloor !== requestFloor) return null;
               const merged = Object.assign({}, exactCached);
+              merged.floor = requestFloor;
               merged.locationStates = statesRes && statesRes.ok ? (statesRes.locationStates || {}) : {};
               return merged;
             });
         }
       }
 
-      return callGas("inventoryGetMap", { floor: currentMapFloor, compact: "1", __timeoutMs: 60000 })
+      return callGas("inventoryGetMap", { floor: requestFloor, compact: "1", __timeoutMs: 60000 })
         .then(function(fullRes) {
+          if (currentMapFloor !== requestFloor) return null;
           const normalized = normalizeInventoryMapResponse_(fullRes);
           if (normalized && normalized.ok && normalized.layoutVersion) {
+            normalized.floor = requestFloor;
             const layoutOnly = Object.assign({}, normalized);
             delete layoutOnly.locationStates;
-            writeInventoryMapLayoutToBrowserCache_(currentMapFloor, normalized.layoutVersion, layoutOnly);
+            writeInventoryMapLayoutToBrowserCache_(requestFloor, normalized.layoutVersion, layoutOnly);
           }
           return normalized;
         });
     })
     .then(function(res) {
       if (!res) return;
+      if (currentMapFloor !== requestFloor) return;
 
       endSearchLoading_();
 
@@ -2111,12 +2128,14 @@ function loadInventoryMap(floor) {
       }
 
       const normalized = normalizeInventoryMapResponse_(res);
+      normalized.floor = requestFloor;
       currentMapState = normalized.locationStates || {};
       currentMapData = normalized;
       renderInventoryMap(normalized);
-      showMapMessage("info", currentMapFloor === "2F" ? "2階を表示中です。" : "1階を表示中です。");
+      showMapMessage("info", requestFloor === "2F" ? "2階を表示中です。" : "1階を表示中です。");
     })
     .catch(function(err) {
+      if (currentMapFloor !== requestFloor) return;
       if (!showedCached) {
         endSearchLoading_();
         showMapMessage("error", err && err.message ? err.message : String(err));
@@ -2355,6 +2374,7 @@ function renderInventoryMapGrid_(grid, data, readOnly) {
   var rowHeights = data.rowHeights || [];
   var colWidths = data.colWidths || [];
   var portraitMap = shouldUsePortraitMapLayout_();
+  var cells = data.cells || [];
 
   grid.innerHTML = "";
   grid.style.gap = "0px";
@@ -2363,25 +2383,110 @@ function renderInventoryMapGrid_(grid, data, readOnly) {
   grid.style.boxSizing = "border-box";
   grid.style.padding = INVENTORY_MAP_VIEW_PADDING_PX + "px";
 
-  if (portraitMap) {
-    grid.style.gridTemplateColumns = rowHeights.slice(0, rows).map(function(h) {
-      return getMapCssSizePx_(h, 36, 8) + "px";
-    }).join(" ") || ("repeat(" + rows + ", 36px)");
-    grid.style.gridTemplateRows = colWidths.slice(0, cols).reverse().map(function(w) {
-      return getMapCssSizePx_(w, 64, 8) + "px";
-    }).join(" ") || ("repeat(" + cols + ", 64px)");
-  } else {
-    grid.style.gridTemplateColumns = colWidths.slice(0, cols).map(function(w) {
-      return getMapCssSizePx_(w, 64, 8) + "px";
-    }).join(" ") || ("repeat(" + cols + ", 64px)");
-    grid.style.gridTemplateRows = rowHeights.slice(0, rows).map(function(h) {
-      return getMapCssSizePx_(h, 36, 8) + "px";
-    }).join(" ") || ("repeat(" + rows + ", 36px)");
+  function mappedCellInfo_(cell) {
+    var value = cell.value || "";
+    var row = Number(cell.row || 1);
+    var col = Number(cell.col || 1);
+    var rowspan = Number(cell.rowspan || 1);
+    var colspan = Number(cell.colspan || 1);
+    var style = cell.style || {};
+    var hasSpreadsheetBorder = !!(style && (style.hasBorder || hasAnyVisibleMapBorder_(style.borders)));
+    var hasVisibleBackground = !!(style && style.background && !isMapStyleWhite_(style.background));
+    var meaningful = !!(
+      String(value || "").trim() ||
+      hasSpreadsheetBorder ||
+      hasVisibleBackground ||
+      rowspan > 1 ||
+      colspan > 1 ||
+      cell.isLocation ||
+      isInventoryLocationText_(value)
+    );
+
+    if (portraitMap) {
+      return {
+        cell: cell,
+        value: value,
+        rowStart: cols - col - colspan + 2,
+        rowSpan: colspan,
+        colStart: row,
+        colSpan: rowspan,
+        meaningful: meaningful
+      };
+    }
+
+    return {
+      cell: cell,
+      value: value,
+      rowStart: row,
+      rowSpan: rowspan,
+      colStart: col,
+      colSpan: colspan,
+      meaningful: meaningful
+    };
   }
 
-  (data.cells || []).forEach(function(cell) {
+  var mapped = cells.map(mappedCellInfo_);
+  var displayRows = portraitMap ? cols : rows;
+  var displayCols = portraitMap ? rows : cols;
+  var minRow = displayRows + 1;
+  var minCol = displayCols + 1;
+  var maxRow = 0;
+  var maxCol = 0;
+
+  mapped.forEach(function(info) {
+    if (!info.meaningful) return;
+    minRow = Math.min(minRow, info.rowStart);
+    minCol = Math.min(minCol, info.colStart);
+    maxRow = Math.max(maxRow, info.rowStart + info.rowSpan - 1);
+    maxCol = Math.max(maxCol, info.colStart + info.colSpan - 1);
+  });
+
+  if (!maxRow || !maxCol) {
+    minRow = 1;
+    minCol = 1;
+    maxRow = displayRows;
+    maxCol = displayCols;
+  }
+
+  minRow = Math.max(1, Math.min(displayRows, minRow));
+  minCol = Math.max(1, Math.min(displayCols, minCol));
+  maxRow = Math.max(minRow, Math.min(displayRows, maxRow));
+  maxCol = Math.max(minCol, Math.min(displayCols, maxCol));
+
+  var colTrackSizes;
+  var rowTrackSizes;
+
+  if (portraitMap) {
+    colTrackSizes = rowHeights.slice(0, rows).map(function(h) {
+      return getMapCssSizePx_(h, 36, 8) + "px";
+    });
+    rowTrackSizes = colWidths.slice(0, cols).reverse().map(function(w) {
+      return getMapCssSizePx_(w, 64, 8) + "px";
+    });
+  } else {
+    colTrackSizes = colWidths.slice(0, cols).map(function(w) {
+      return getMapCssSizePx_(w, 64, 8) + "px";
+    });
+    rowTrackSizes = rowHeights.slice(0, rows).map(function(h) {
+      return getMapCssSizePx_(h, 36, 8) + "px";
+    });
+  }
+
+  var visibleColTracks = colTrackSizes.slice(minCol - 1, maxCol);
+  var visibleRowTracks = rowTrackSizes.slice(minRow - 1, maxRow);
+
+  grid.style.gridTemplateColumns = visibleColTracks.join(" ") || ("repeat(" + (maxCol - minCol + 1) + ", 64px)");
+  grid.style.gridTemplateRows = visibleRowTracks.join(" ") || ("repeat(" + (maxRow - minRow + 1) + ", 36px)");
+
+  mapped.forEach(function(info) {
+    var cell = info.cell;
+    var value = info.value;
+    var rowEnd = info.rowStart + info.rowSpan - 1;
+    var colEnd = info.colStart + info.colSpan - 1;
+
+    if (rowEnd < minRow || info.rowStart > maxRow || colEnd < minCol || info.colStart > maxCol) return;
+
     var div = document.createElement("div");
-    var value = cell.value || "";
     var isLocation = !!cell.isLocation || isInventoryLocationText_(value);
     var state = isLocation ? getInventoryMapStateForLocation_(stateMap, value) : "";
     var row = Number(cell.row || 1);
@@ -2396,9 +2501,8 @@ function renderInventoryMapGrid_(grid, data, readOnly) {
     div.textContent = value;
     div.title = value;
 
-    var rotatedRow = cols - col - colspan + 2;
-    div.style.gridColumn = portraitMap ? (String(row) + " / span " + String(rowspan)) : (String(col) + " / span " + String(colspan));
-    div.style.gridRow = portraitMap ? (String(rotatedRow) + " / span " + String(colspan)) : (String(row) + " / span " + String(rowspan));
+    div.style.gridColumn = String(info.colStart - minCol + 1) + " / span " + String(info.colSpan);
+    div.style.gridRow = String(info.rowStart - minRow + 1) + " / span " + String(info.rowSpan);
 
     applyMapCellSpreadsheetStyle_(div, style, isLocation, state, value);
 
