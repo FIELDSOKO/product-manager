@@ -55,6 +55,7 @@ let currentInventoryMarkedListTitle = "";
 let currentInventoryBackButtonLabel = "記入済商品一覧へ戻る";
 const INVENTORY_MAP_VIEW_PADDING_PX = 42;
 let currentInventoryMapLayoutSignature_ = "";
+let currentInventoryMapOriginalLayoutMetrics_ = null;
 
 function initApp_() {
   setAppVersion();
@@ -1768,22 +1769,24 @@ function renderInventoryMap(data, forceLayoutRender) {
 
   data = normalizeInventoryMapResponse_(data);
   const nextSignature = getInventoryMapLayoutSignature_(data);
-  const hasRenderedLayout = !!(grid && grid.dataset && grid.dataset.layoutSignature);
-  const sameLayout = !!currentInventoryMapLayoutSignature_ && nextSignature === currentInventoryMapLayoutSignature_;
+  const renderedSignature = grid && grid.dataset ? (grid.dataset.layoutSignature || "") : "";
+  const hasRenderedLayout = !!(grid && renderedSignature);
 
   currentMapState = (data && data.locationStates) || currentMapState || {};
   currentMapData = data;
 
-  // ロケ状態・記入済状態だけの更新では、レイアウトDOMを作り直さない。
-  // セル幅/列幅/行高さ/grid-template は初回・階切替・レイアウト更新時だけ確定する。
-  if (!forceLayoutRender && hasRenderedLayout && sameLayout && grid.dataset.layoutSignature === nextSignature) {
+  // 状態更新・キャッシュ確認・更新日時確認ではDOMを作り直さない。
+  // 既に同じレイアウトが描画済みなら、セル色/クラスだけを更新する。
+  if (!forceLayoutRender && hasRenderedLayout && renderedSignature === nextSignature) {
+    currentInventoryMapLayoutSignature_ = nextSignature;
     applyInventoryMapStateOnly_(currentMapState);
     applyInventoryMapScaleTransform_();
     updateMapZoomLabel_();
     return;
   }
 
-  // renderInventoryMapGrid_ を呼ぶのは、初回描画・階切替・レイアウト更新・キャッシュ無し時だけ。
+  // renderInventoryMapGrid_ を呼ぶ条件：
+  // 初回描画 / 1F・2F明示切替 / 棚マップ更新日時変更 / キャッシュなし・別レイアウト時のみ。
   renderInventoryMapGrid_(grid, data, false);
   currentInventoryMapLayoutSignature_ = nextSignature;
   if (grid && grid.dataset) grid.dataset.layoutSignature = nextSignature;
@@ -2013,7 +2016,7 @@ function setupMapPinch_() {
 
   window.addEventListener("orientationchange", function() {
     setTimeout(function() {
-      if (currentMapData) {
+      if (activeSection === "map" && currentMapData) {
         // 画面回転では再描画せず、現在の元レイアウトサイズを基準に倍率だけ再計算する。
         fitInventoryMapToScreen_();
       }
@@ -2277,22 +2280,43 @@ function autoFitMapCellText_(div) {
 }
 
 function getInventoryMapBaseSize_() {
+  if (currentInventoryMapOriginalLayoutMetrics_ &&
+      currentInventoryMapOriginalLayoutMetrics_.baseWidth > 0 &&
+      currentInventoryMapOriginalLayoutMetrics_.baseHeight > 0) {
+    return {
+      width: currentInventoryMapOriginalLayoutMetrics_.baseWidth,
+      height: currentInventoryMapOriginalLayoutMetrics_.baseHeight
+    };
+  }
+
   const scale = document.getElementById("mapScale");
   const grid = document.getElementById("mapGrid");
   const w = Number((scale && scale.dataset && scale.dataset.baseWidth) || (grid && grid.dataset && grid.dataset.baseWidth) || 0);
   const h = Number((scale && scale.dataset && scale.dataset.baseHeight) || (grid && grid.dataset && grid.dataset.baseHeight) || 0);
   if (w > 0 && h > 0) return { width: w, height: h };
+
+  // 最終フォールバック。通常は初回描画時に固定保存した値だけを使う。
   return {
-    width: Math.max(1, grid ? (grid.scrollWidth || grid.offsetWidth || 1) : 1),
-    height: Math.max(1, grid ? (grid.scrollHeight || grid.offsetHeight || 1) : 1)
+    width: Math.max(1, grid ? (parseFloat(grid.style.width) || grid.scrollWidth || grid.offsetWidth || 1) : 1),
+    height: Math.max(1, grid ? (parseFloat(grid.style.height) || grid.scrollHeight || grid.offsetHeight || 1) : 1)
   };
 }
 
-function setInventoryMapBaseSize_(baseWidth, baseHeight) {
+function setInventoryMapBaseSize_(baseWidth, baseHeight, gridTemplateColumns, gridTemplateRows, cellWidths, cellHeights) {
   const scale = document.getElementById("mapScale");
   const grid = document.getElementById("mapGrid");
   const w = Math.max(1, Math.ceil(Number(baseWidth || 1)));
   const h = Math.max(1, Math.ceil(Number(baseHeight || 1)));
+
+  currentInventoryMapOriginalLayoutMetrics_ = {
+    originalGridTemplateColumns: String(gridTemplateColumns || (grid && grid.style ? grid.style.gridTemplateColumns : "") || ""),
+    originalGridTemplateRows: String(gridTemplateRows || (grid && grid.style ? grid.style.gridTemplateRows : "") || ""),
+    originalCellWidths: (cellWidths || []).slice ? (cellWidths || []).slice() : [],
+    originalCellHeights: (cellHeights || []).slice ? (cellHeights || []).slice() : [],
+    baseWidth: w,
+    baseHeight: h
+  };
+
   if (scale && scale.dataset) {
     scale.dataset.baseWidth = String(w);
     scale.dataset.baseHeight = String(h);
@@ -2300,6 +2324,16 @@ function setInventoryMapBaseSize_(baseWidth, baseHeight) {
   if (grid && grid.dataset) {
     grid.dataset.baseWidth = String(w);
     grid.dataset.baseHeight = String(h);
+    grid.dataset.originalGridTemplateColumns = currentInventoryMapOriginalLayoutMetrics_.originalGridTemplateColumns;
+    grid.dataset.originalGridTemplateRows = currentInventoryMapOriginalLayoutMetrics_.originalGridTemplateRows;
+  }
+
+  // 元サイズは描画時だけ確定。ズーム・状態更新ではこの値を絶対に書き換えない。
+  if (grid) {
+    grid.style.width = w + "px";
+    grid.style.height = h + "px";
+    grid.style.minWidth = w + "px";
+    grid.style.minHeight = h + "px";
   }
 }
 
@@ -2321,7 +2355,7 @@ function applyInventoryMapScaleTransform_() {
   const s = Math.max(0.01, Number(mapScaleValue || 1));
 
   // ズーム時はセル幅・列幅・行高さ・grid-templateを絶対に変更しない。
-  // mapGridは描画時に確定した元サイズのまま固定し、表示だけtransform: scale()で拡大縮小する。
+  // 変更するのは倍率、transform、スクロール用ラッパー寸法だけ。
   const baseWidth = Math.max(1, Math.ceil(base.width));
   const baseHeight = Math.max(1, Math.ceil(base.height));
   const scaledWidth = Math.max(1, Math.ceil(baseWidth * s));
@@ -2334,8 +2368,12 @@ function applyInventoryMapScaleTransform_() {
 
   grid.style.setProperty("transform-origin", "0 0", "important");
   grid.style.transform = "scale(" + s + ")";
+
+  // 初回描画時に固定した元サイズを再適用するだけ。scale後サイズを元サイズとして保存しない。
   grid.style.width = baseWidth + "px";
   grid.style.height = baseHeight + "px";
+  grid.style.minWidth = baseWidth + "px";
+  grid.style.minHeight = baseHeight + "px";
 }
 
 function updateInventoryMapScaleBoxSize_() {
@@ -2515,6 +2553,7 @@ function renderInventoryMapGrid_(grid, data, readOnly) {
   var cells = data.cells || [];
 
   grid.innerHTML = "";
+  currentInventoryMapOriginalLayoutMetrics_ = null;
   grid.style.gap = "0px";
   grid.style.alignItems = "stretch";
   grid.style.justifyContent = "start";
@@ -2620,7 +2659,14 @@ function renderInventoryMapGrid_(grid, data, readOnly) {
   var baseGridHeight = visibleRowTracks.reduce(function(sum, v) { return sum + (parseFloat(v) || 0); }, 0) + INVENTORY_MAP_VIEW_PADDING_PX * 2;
   if (!baseGridWidth || baseGridWidth < 1) baseGridWidth = (maxCol - minCol + 1) * 64 + INVENTORY_MAP_VIEW_PADDING_PX * 2;
   if (!baseGridHeight || baseGridHeight < 1) baseGridHeight = (maxRow - minRow + 1) * 36 + INVENTORY_MAP_VIEW_PADDING_PX * 2;
-  setInventoryMapBaseSize_(baseGridWidth, baseGridHeight);
+  setInventoryMapBaseSize_(
+    baseGridWidth,
+    baseGridHeight,
+    grid.style.gridTemplateColumns,
+    grid.style.gridTemplateRows,
+    visibleColTracks.map(function(v) { return parseFloat(v) || 0; }),
+    visibleRowTracks.map(function(v) { return parseFloat(v) || 0; })
+  );
 
   mapped.forEach(function(info) {
     var cell = info.cell;
