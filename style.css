@@ -457,6 +457,7 @@ button {
   overflow: visible !important;
   position: relative;
   transition: transform 0.08s linear;
+  flex: 0 0 auto;
 }
 
 .mapGrid {
@@ -467,6 +468,7 @@ button {
   box-sizing: border-box;
   transform-origin: 0 0 !important;
   will-change: transform;
+  flex: 0 0 auto;
 }
 
 .mapCell {
@@ -581,11 +583,11 @@ body.map-active .mapOuter {
 }
 
 .mapZoomControls {
-  display: grid;
-  grid-template-columns: 1fr 52px 52px minmax(96px, auto) !important;
-  gap: 8px;
+  display: flex;
   align-items: center;
-  margin-top: 10px;
+  gap: 8px;
+  margin: 10px 0;
+  flex-wrap: wrap;
 }
 
 .mapZoomLabel {
@@ -653,3 +655,17 @@ body.map-active .mapOuter {
   }
 }
 
+
+
+.mapZoomBtn {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0 !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  line-height: 1;
+}

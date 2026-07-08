@@ -54,6 +54,7 @@ let currentInventoryMarkedListLocation = "";
 let currentInventoryMarkedListTitle = "";
 let currentInventoryBackButtonLabel = "記入済商品一覧へ戻る";
 const INVENTORY_MAP_VIEW_PADDING_PX = 42;
+let currentInventoryMapLayoutSignature_ = "";
 
 function initApp_() {
   setAppVersion();
@@ -1745,11 +1746,37 @@ function inventoryRenderGroupedList(groups, title) {
 
 
 
+
+function getInventoryMapLayoutSignature_(data) {
+  data = data || {};
+  var compactParts = [
+    String(data.floor || currentMapFloor || "1F"),
+    String(data.layoutVersion || data.v || ""),
+    String(data.rows || data.r || ""),
+    String(data.cols || data.c || ""),
+    String((data.rowHeights || data.rh || []).join(",")),
+    String((data.colWidths || data.cw || []).join(",")),
+    String((data.cells || data.ce || []).length)
+  ];
+  return compactParts.join("|");
+}
+
 function renderInventoryMap(data) {
   const grid = document.getElementById("mapGrid");
+  const nextSignature = getInventoryMapLayoutSignature_(data);
+  const shouldFitWhole = !currentInventoryMapLayoutSignature_ || nextSignature !== currentInventoryMapLayoutSignature_;
+
   renderInventoryMapGrid_(grid, data, false);
+  currentInventoryMapLayoutSignature_ = nextSignature;
+
   requestAnimationFrame(function() {
-    fitInventoryMapToScreen_();
+    if (shouldFitWhole) {
+      fitInventoryMapToScreen_();
+    } else {
+      // ロケ状態更新など同じレイアウトの再描画では、倍率だけ維持してサイズを同期する。
+      updateInventoryMapScaleBoxSize_();
+      updateMapZoomLabel_();
+    }
   });
 }
 
@@ -1950,14 +1977,14 @@ function mapZoomIn() {
   const outer = document.getElementById("mapOuter");
   if (!outer) return;
   const rect = outer.getBoundingClientRect();
-  setInventoryMapScale_((mapScaleValue || 1) * 1.2, rect.left + outer.clientWidth / 2, rect.top + outer.clientHeight / 2);
+  setInventoryMapScale_((mapScaleValue || 1) * 1.15, rect.left + outer.clientWidth / 2, rect.top + outer.clientHeight / 2);
 }
 
 function mapZoomOut() {
   const outer = document.getElementById("mapOuter");
   if (!outer) return;
   const rect = outer.getBoundingClientRect();
-  setInventoryMapScale_((mapScaleValue || 1) / 1.2, rect.left + outer.clientWidth / 2, rect.top + outer.clientHeight / 2);
+  setInventoryMapScale_((mapScaleValue || 1) / 1.15, rect.left + outer.clientWidth / 2, rect.top + outer.clientHeight / 2);
 }
 
 function mapFitWhole() {
@@ -2234,16 +2261,22 @@ function applyInventoryMapScaleTransform_() {
   const base = getInventoryMapBaseSize_();
   const s = Math.max(0.01, Number(mapScaleValue || 1));
 
-  // grid-template-columns / rows とセル幅は基準値のまま固定し、ズームはtransformだけで行う。
-  scale.style.transform = "none";
-  scale.style.transformOrigin = "0 0";
-  scale.style.width = Math.ceil(base.width * s) + "px";
-  scale.style.height = Math.ceil(base.height * s) + "px";
+  // ズーム時はセル幅・列幅・行高さ・grid-templateを絶対に変更しない。
+  // mapGridは描画時に確定した元サイズのまま固定し、表示だけtransform: scale()で拡大縮小する。
+  const baseWidth = Math.max(1, Math.ceil(base.width));
+  const baseHeight = Math.max(1, Math.ceil(base.height));
+  const scaledWidth = Math.max(1, Math.ceil(baseWidth * s));
+  const scaledHeight = Math.max(1, Math.ceil(baseHeight * s));
 
-  grid.style.transformOrigin = "0 0";
+  scale.style.setProperty("transform", "none", "important");
+  scale.style.setProperty("transform-origin", "0 0", "important");
+  scale.style.width = scaledWidth + "px";
+  scale.style.height = scaledHeight + "px";
+
+  grid.style.setProperty("transform-origin", "0 0", "important");
   grid.style.transform = "scale(" + s + ")";
-  grid.style.width = base.width + "px";
-  grid.style.height = base.height + "px";
+  grid.style.width = baseWidth + "px";
+  grid.style.height = baseHeight + "px";
 }
 
 function updateInventoryMapScaleBoxSize_() {
@@ -2262,7 +2295,7 @@ function fitInventoryMapToScreen_() {
   const rawH = Math.max(1, base.height);
   const availableW = Math.max(1, outer.clientWidth - 24);
   const availableH = Math.max(1, outer.clientHeight - 24);
-  const nextScale = Math.min(1, availableW / rawW, availableH / rawH);
+  const nextScale = Math.round(Math.min(1, availableW / rawW, availableH / rawH) * 10000) / 10000;
 
   mapMinScaleValue = Math.max(0.03, nextScale);
   mapScaleValue = mapMinScaleValue;
@@ -2278,8 +2311,10 @@ function setInventoryMapScale_(nextScale, centerClientX, centerClientY) {
   const scale = document.getElementById("mapScale");
   if (!outer || !scale) return;
 
-  const oldScale = mapScaleValue || 1;
+  const oldScale = Math.max(0.01, Number(mapScaleValue || 1));
   nextScale = Math.max(mapMinScaleValue || 0.03, Math.min(4, Number(nextScale || oldScale)));
+  // 小数点誤差が次回の基準へ蓄積しないよう、倍率だけを丸めて管理する。
+  nextScale = Math.round(nextScale * 10000) / 10000;
 
   const rect = outer.getBoundingClientRect();
   const centerX = Number.isFinite(centerClientX) ? centerClientX - rect.left : outer.clientWidth / 2;
@@ -2291,8 +2326,8 @@ function setInventoryMapScale_(nextScale, centerClientX, centerClientY) {
   mapScaleValue = nextScale;
   applyInventoryMapScaleTransform_();
 
-  outer.scrollLeft = Math.max(0, contentX * mapScaleValue - centerX);
-  outer.scrollTop = Math.max(0, contentY * mapScaleValue - centerY);
+  outer.scrollLeft = Math.max(0, Math.round(contentX * mapScaleValue - centerX));
+  outer.scrollTop = Math.max(0, Math.round(contentY * mapScaleValue - centerY));
   clampInventoryMapScroll_();
   updateMapZoomLabel_();
 }
