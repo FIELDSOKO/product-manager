@@ -8,6 +8,10 @@ on:
       - 'version.json'
   workflow_dispatch:
 
+concurrency:
+  group: update-version-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: write
 
@@ -28,7 +32,8 @@ jobs:
           printf '{\n  "version": "%s"\n}\n' "$VERSION" > version.json
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
-      - name: Commit version.json
+      - name: Commit and Push with Auto Retry
+        shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -40,4 +45,25 @@ jobs:
 
           git add version.json
           git commit -m "chore: update version.json ${VERSION} [skip actions]"
-          git push
+
+          for i in 1 2 3 4 5; do
+            echo "========== Retry ${i} =========="
+
+            git fetch origin main
+
+            if ! git pull --rebase origin main; then
+              echo "Rebase failed. Aborting..."
+              git rebase --abort || true
+            fi
+
+            if git push origin HEAD:main; then
+              echo "Push succeeded."
+              exit 0
+            fi
+
+            echo "Push failed. Waiting before retry..."
+            sleep 3
+          done
+
+          echo "ERROR: Push failed after 5 retries."
+          exit 1
