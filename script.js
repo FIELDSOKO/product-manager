@@ -61,6 +61,7 @@ let inventoryMapStateRefreshBusy_ = false;
 let inventoryMapStateRefreshFloor_ = "";
 let inventoryMapLayoutRenderSeq_ = 0;
 let inventoryMapPendingLayoutFrame_ = 0;
+let inventoryMapFitMode_ = false;
 
 function initApp_() {
   setAppVersion();
@@ -2444,6 +2445,13 @@ function getMapCssBorderStyle_(sheetStyle) {
 function autoFitMapCellText_(div) {
   if (!div || !String(div.textContent || "").trim()) return;
 
+  // 固定文字（シャッター・リフト等の非ロケ文字）は、初回描画時の文字サイズ/行高さを維持する。
+  // 状態更新や遅延処理で font-size / line-height を再計算しない。
+  if (div.dataset && div.dataset.fixedTextCell === "1") {
+    div.dataset.autoFitDone = "1";
+    return;
+  }
+
   // 文字自動縮小は初回DOM生成直後だけ行う。
   // 一度縮小された現在値を次回基準にしないよう、必ずシート由来の元サイズから計算する。
   if (div.dataset && div.dataset.autoFitDone === "1") return;
@@ -2549,6 +2557,7 @@ function clampInventoryMapScroll_() {
 function applyInventoryMapScaleTransform_() {
   const scale = document.getElementById("mapScale");
   const grid = document.getElementById("mapGrid");
+  const outer = document.getElementById("mapOuter");
   if (!scale || !grid) return;
 
   const base = getInventoryMapBaseSize_();
@@ -2558,14 +2567,17 @@ function applyInventoryMapScaleTransform_() {
   const baseWidth = Math.max(1, Math.ceil(base.width));
   const baseHeight = Math.max(1, Math.ceil(base.height));
 
-  // ズーム・全体表示・resizeで変更するのは transform だけ。
-  // 以前はここで mapScale の width/height を倍率に合わせて毎回変更していたため、
-  // 全体表示連打・＋/－連打・表示後の遅延resizeでスクロール領域が再計算され、
-  // セル幅が細く見える/列幅が崩れる原因になっていた。
-  scale.style.setProperty("transform", "scale(" + s + ")", "important");
-  scale.style.setProperty("transform-origin", "0 0", "important");
+  // ズーム・全体表示で変更するのは transform だけ。
+  // mapScale / mapGrid の width・height は setInventoryMapBaseSize_() で初回描画時だけ固定する。
+  var tx = 0;
+  var ty = 0;
+  if (inventoryMapFitMode_ && outer) {
+    tx = Math.max(0, Math.round((outer.clientWidth - baseWidth * s) / 2));
+    ty = Math.max(0, Math.round((outer.clientHeight - baseHeight * s) / 2));
+  }
 
-  // mapScale/mapGrid の width/height は setInventoryMapBaseSize_ で初回描画時だけ固定済み。
+  scale.style.setProperty("transform", "translate(" + tx + "px, " + ty + "px) scale(" + s + ")", "important");
+  scale.style.setProperty("transform-origin", "0 0", "important");
 
   grid.style.setProperty("transform", "none", "important");
   grid.style.setProperty("transform-origin", "0 0", "important");
@@ -2594,10 +2606,11 @@ function fitInventoryMapToScreen_() {
 
   mapMinScaleValue = Math.max(0.03, nextScale);
   mapScaleValue = mapMinScaleValue;
+  inventoryMapFitMode_ = true;
+  outer.style.overflow = "hidden";
   applyInventoryMapScaleTransform_();
   outer.scrollLeft = 0;
   outer.scrollTop = 0;
-  clampInventoryMapScroll_();
   updateMapZoomLabel_();
 }
 
@@ -2605,6 +2618,9 @@ function setInventoryMapScale_(nextScale, centerClientX, centerClientY) {
   const outer = document.getElementById("mapOuter");
   const scale = document.getElementById("mapScale");
   if (!outer || !scale) return;
+
+  inventoryMapFitMode_ = false;
+  outer.style.overflow = "auto";
 
   const oldScale = Math.max(0.01, Number(mapScaleValue || 1));
   nextScale = Math.max(mapMinScaleValue || 0.03, Math.min(4, Number(nextScale || oldScale)));
@@ -2734,7 +2750,13 @@ function getMapCssFontPxFromSheetPt_(pt) {
 function hasAnyVisibleMapBorder_(borders) {
   if (!borders) return false;
   return ["top", "right", "bottom", "left"].some(function(side) {
-    return !!(borders[side] && borders[side].visible);
+    var b = borders[side] || {};
+    return !!(
+      b.visible ||
+      Number(b.width || 0) > 0 ||
+      String(b.color || "").trim() ||
+      String(b.style || "").trim()
+    );
   });
 }
 
@@ -2904,6 +2926,9 @@ function renderInventoryMapGrid_(grid, data, readOnly) {
       div.classList.add("mapCellBlank");
       if (!String(value || "").trim() && !hasSpreadsheetBorder && !hasVisibleBackground && !(rowspan > 1 || colspan > 1)) {
         div.classList.add("mapCellEmpty");
+      } else if (hasSpreadsheetBorder) {
+        div.classList.add("mapCellHasBorder");
+        div.classList.remove("mapCellEmpty", "mapCellNoBorder");
       }
     }
 
@@ -2936,9 +2961,13 @@ function applyMapCellSpreadsheetStyle_(div, style, isLocation, state, value) {
   div.style.setProperty("font-weight", weight, "important");
 
   var fontPx = getMapCssFontPxFromSheetPt_(style.fontSize || 12);
-  if (div.dataset) div.dataset.originalFontSizePx = String(fontPx);
+  var hasText = !!String(value || "").trim();
+  if (div.dataset) {
+    div.dataset.originalFontSizePx = String(fontPx);
+    div.dataset.fixedTextCell = (!isLocation && hasText) ? "1" : "0";
+  }
   div.style.setProperty("font-size", fontPx + "px", "important");
-  div.style.setProperty("line-height", "1.05", "important");
+  div.style.setProperty("line-height", (!isLocation && hasText) ? "1.22" : "1.12", "important");
   div.style.setProperty("min-width", "0", "important");
   div.style.setProperty("min-height", "0", "important");
   div.style.setProperty("border-radius", "0", "important");
