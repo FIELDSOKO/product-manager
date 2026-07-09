@@ -58,7 +58,7 @@ let currentInventoryMarkedListLocation = "";
 let currentInventoryMarkedListTitle = "";
 let currentInventoryBackButtonLabel = "記入済商品一覧へ戻る";
 const INVENTORY_MAP_VIEW_PADDING_PX = 0;
-const INVENTORY_MAP_CACHE_SCHEMA_VERSION = 9;
+const INVENTORY_MAP_CACHE_SCHEMA_VERSION = 11;
 let currentInventoryMapLayoutSignature_ = "";
 let currentInventoryMapOriginalLayoutMetrics_ = null;
 let inventoryMapStateRefreshTimer_ = null;
@@ -2314,8 +2314,14 @@ function expandInventoryMapBorders_(borders) {
   const out = {};
   sides.forEach(function(side, i) {
     const b = borders[i] || [0];
+    const visible = !!(
+      b[0] ||
+      Number(b[1] || 0) > 0 ||
+      String(b[2] || "").trim() ||
+      String(b[3] || "").trim()
+    );
     out[side] = {
-      visible: !!b[0],
+      visible: visible,
       width: Number(b[1] || 0),
       color: b[2] || "",
       style: b[3] || ""
@@ -2846,14 +2852,15 @@ function normalizeInventoryMapResponse_(res) {
 
   var styles = (res.st || []).map(function(s) {
     var b = s && s[6] ? s[6] : null;
+    var expandedBorders = expandInventoryMapBorders_(b);
     return {
       background: s && s[0] ? s[0] : "",
       fontColor: s && s[1] ? s[1] : "",
       fontWeight: s && s[2] ? s[2] : "",
       fontSize: s && s[3] ? s[3] : "",
-      hasBorder: !!(s && s[4]),
+      hasBorder: !!(s && s[4]) || hasAnyVisibleMapBorder_(expandedBorders),
       borderColor: s && s[5] ? s[5] : "",
-      borders: expandInventoryMapBorders_(b)
+      borders: expandedBorders
     };
   });
 
@@ -2914,11 +2921,12 @@ function hasAnyVisibleMapBorder_(borders) {
   if (!borders) return false;
   return ["top", "right", "bottom", "left"].some(function(side) {
     var b = borders[side] || {};
+    var borderStyle = String(b.style || "").trim().toUpperCase();
     return !!(
       b.visible ||
       Number(b.width || 0) > 0 ||
       String(b.color || "").trim() ||
-      String(b.style || "").trim()
+      (borderStyle && borderStyle !== "NONE")
     );
   });
 }
@@ -3132,11 +3140,12 @@ function applyMapCellSpreadsheetStyle_(div, style, isLocation, state, value) {
 
 function isVisibleMapBorderSide_(border) {
   if (!border) return false;
+  var borderStyle = String(border.style || "").trim().toUpperCase();
   return !!(
     border.visible ||
     Number(border.width || 0) > 0 ||
     String(border.color || "").trim() ||
-    String(border.style || "").trim()
+    (borderStyle && borderStyle !== "NONE")
   );
 }
 
