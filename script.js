@@ -59,6 +59,8 @@ let currentInventoryMapOriginalLayoutMetrics_ = null;
 let inventoryMapStateRefreshTimer_ = null;
 let inventoryMapStateRefreshBusy_ = false;
 let inventoryMapStateRefreshFloor_ = "";
+let inventoryMapLayoutRenderSeq_ = 0;
+let inventoryMapPendingLayoutFrame_ = 0;
 
 function initApp_() {
   setAppVersion();
@@ -1763,24 +1765,81 @@ function inventoryRenderGroupedList(groups, title) {
 
 function getInventoryMapLayoutSignature_(data) {
   data = data || {};
+
+  // レイアウト同一判定では layoutVersion / 更新日時を使わない。
+  // 後から追加したキャッシュ更新確認で layoutVersion だけが変わった場合、
+  // 実際の行列・セル・書式が同一でも renderInventoryMapGrid_ が再実行され、
+  // 表示後約10秒の裏通信完了時にセル幅が崩れる原因になっていた。
+  // ここでは実レイアウトを構成する値だけで署名を作る。
+  var cells = data.cells || data.ce || [];
+
+  function styleSignature_(style) {
+    style = style || {};
+    var borders = style.borders || {};
+    var borderParts = ["top", "right", "bottom", "left"].map(function(side) {
+      var b = borders[side] || {};
+      return [
+        side,
+        b.visible ? "1" : "0",
+        b.width || "",
+        b.color || "",
+        b.style || ""
+      ].join(":");
+    }).join(";");
+
+    return [
+      style.background || "",
+      style.fontColor || "",
+      style.fontWeight || "",
+      style.fontSize || "",
+      style.hasBorder ? "1" : "0",
+      style.borderColor || "",
+      borderParts
+    ].join("~");
+  }
+
+  var cellParts = cells.map(function(cell) {
+    cell = cell || {};
+    return [
+      cell.row || "",
+      cell.col || "",
+      cell.rowspan || "",
+      cell.colspan || "",
+      cell.isLocation ? "1" : "0",
+      String(cell.value || ""),
+      styleSignature_(cell.style || {})
+    ].join("^");
+  });
+
   var compactParts = [
     String(data.floor || currentMapFloor || "1F"),
-    String(data.layoutVersion || data.v || ""),
     String(data.rows || data.r || ""),
     String(data.cols || data.c || ""),
     String((data.rowHeights || data.rh || []).join(",")),
     String((data.colWidths || data.cw || []).join(",")),
-    String((data.cells || data.ce || []).length)
+    cellParts.join("|")
   ];
-  return compactParts.join("|");
+  return compactParts.join("||");
 }
 
 
 function isInventoryMapLayoutRenderAllowed_(reason, renderedSignature, nextSignature) {
   reason = String(reason || "");
-  if (!renderedSignature) return true; // 初回マップ描画
-  if (renderedSignature !== nextSignature) return true; // 1F/2F切替・棚マップ更新日時変更・キャッシュなし取得
-  return reason === "forceLayout";
+
+  // renderInventoryMapGrid_ を許可する理由を明示的に限定する。
+  // 許可：初回描画 / 1F・2F切替 / 棚マップ更新日時変更 / キャッシュなし取得。
+  const allowedReason =
+    reason === "initial" ||
+    reason === "floorChanged" ||
+    reason === "layoutVersionChanged" ||
+    reason === "cacheMissing";
+
+  if (!allowedReason) return false;
+  if (!renderedSignature) return true;
+  if (renderedSignature !== nextSignature) return true;
+
+  // 同一レイアウトなら、状態だけ更新する。
+  return false;
 }
 
 function renderInventoryMap(data, layoutRenderReason) {
@@ -1802,13 +1861,23 @@ function renderInventoryMap(data, layoutRenderReason) {
     return;
   }
 
+  if (inventoryMapPendingLayoutFrame_) {
+    cancelAnimationFrame(inventoryMapPendingLayoutFrame_);
+    inventoryMapPendingLayoutFrame_ = 0;
+  }
+
+  const renderSeq = ++inventoryMapLayoutRenderSeq_;
+
   // renderInventoryMapGrid_ を呼ぶ条件：
   // 初回描画 / 1F・2F切替 / 棚マップ更新日時変更 / キャッシュなし取得 のみ。
   renderInventoryMapGrid_(grid, data, false);
   currentInventoryMapLayoutSignature_ = nextSignature;
   if (grid && grid.dataset) grid.dataset.layoutSignature = nextSignature;
 
-  requestAnimationFrame(function() {
+  inventoryMapPendingLayoutFrame_ = requestAnimationFrame(function() {
+    inventoryMapPendingLayoutFrame_ = 0;
+    if (renderSeq !== inventoryMapLayoutRenderSeq_) return;
+    // 初回描画直後だけ全体表示倍率を計算する。resize/focus/状態更新からは呼ばない。
     fitInventoryMapToScreen_();
   });
 }
@@ -2097,8 +2166,11 @@ function setupMapPinch_() {
   window.addEventListener("orientationchange", function() {
     setTimeout(function() {
       if (activeSection === "map" && currentMapData) {
-        // 画面回転では再描画せず、現在の元レイアウトサイズを基準に倍率だけ再計算する。
-        fitInventoryMapToScreen_();
+        // 画面回転では再描画・全体表示再計算を行わない。
+        // 保存済み元サイズと現在倍率を維持し、スクロール範囲だけ補正する。
+        applyInventoryMapScaleTransform_();
+        clampInventoryMapScroll_();
+        updateMapZoomLabel_();
       }
     }, 300);
   });
@@ -2142,8 +2214,11 @@ document.addEventListener("DOMContentLoaded", function() {
 
 window.addEventListener("resize", function() {
   if (activeSection === "map" && currentMapData) {
-    // リサイズではレイアウトDOMを作り直さず、元サイズ固定のまま倍率だけ調整する。
-    fitInventoryMapToScreen_();
+    // モバイルブラウザのアドレスバー表示変化などで、表示後数秒以内にresizeが発火することがある。
+    // ここで全体表示を再計算すると見た目のセル幅が変わるため、倍率は維持してスクロール範囲だけ補正する。
+    applyInventoryMapScaleTransform_();
+    clampInventoryMapScroll_();
+    updateMapZoomLabel_();
   }
 });
 
@@ -2213,6 +2288,7 @@ function expandInventoryMapBorders_(borders) {
 
 function loadInventoryMap(floor) {
   var requestedFloor = String(floor || "").toUpperCase();
+  const previousFloor = currentMapFloor || "1F";
   if (requestedFloor === "1F" || requestedFloor === "2F") {
     currentMapFloor = requestedFloor;
   } else {
@@ -2220,18 +2296,21 @@ function loadInventoryMap(floor) {
   }
 
   const requestFloor = currentMapFloor;
+  const layoutReasonForFirstRender = previousFloor && previousFloor !== requestFloor ? "floorChanged" : "initial";
   stopInventoryMapAutoRefresh_();
   hideMapMessage();
 
   const cachedLayout = readLatestInventoryMapLayoutFromBrowserCache_(requestFloor);
   let showedCached = false;
+  let cachedLayoutVersion = "";
 
   if (cachedLayout) {
     const cachedNormalized = normalizeInventoryMapResponse_(Object.assign({}, cachedLayout));
     cachedNormalized.floor = requestFloor;
     cachedNormalized.locationStates = currentMapState || {};
+    cachedLayoutVersion = String(cachedNormalized.layoutVersion || "");
     currentMapData = cachedNormalized;
-    renderInventoryMap(cachedNormalized, "initial");
+    renderInventoryMap(cachedNormalized, layoutReasonForFirstRender);
     showMapMessage("info", requestFloor === "2F" ? "2階を表示中です。" : "1階を表示中です。");
     startInventoryMapAutoRefresh_();
     showedCached = true;
@@ -2241,10 +2320,8 @@ function loadInventoryMap(floor) {
       .then(function(statesRes) {
         if (currentMapFloor !== requestFloor) return;
         if (!statesRes || !statesRes.ok) return;
-        const merged = Object.assign({}, cachedNormalized);
-        merged.locationStates = statesRes.locationStates || {};
-        currentMapState = merged.locationStates || {};
-        currentMapData = merged;
+        currentMapState = statesRes.locationStates || {};
+        if (currentMapData) currentMapData.locationStates = currentMapState;
         // 状態取得後はセルの色・クラスだけ更新し、レイアウト再描画はしない。
         applyInventoryMapStateOnly_(currentMapState);
         updateMapZoomLabel_();
@@ -2259,8 +2336,22 @@ function loadInventoryMap(floor) {
     .then(function(meta) {
       if (currentMapFloor !== requestFloor) return null;
 
-      if (meta && meta.ok && meta.layoutVersion) {
-        const exactCached = readInventoryMapLayoutFromBrowserCache_(requestFloor, meta.layoutVersion);
+      const metaLayoutVersion = meta && meta.ok && meta.layoutVersion ? String(meta.layoutVersion) : "";
+
+      // キャッシュ表示済みで、棚マップ更新日時が変わっていない場合はフルマップを取得しない。
+      // これにより、表示後約10秒前後の裏通信完了で renderInventoryMapGrid_ が再実行される経路を遮断する。
+      if (showedCached && cachedLayoutVersion && metaLayoutVersion && metaLayoutVersion === cachedLayoutVersion) {
+        return null;
+      }
+
+      // メタ情報が取れない/更新日時が空の場合も、キャッシュ表示済みなら現在表示を維持する。
+      // 不明なメタを理由にフル再描画へ進めない。
+      if (showedCached && !metaLayoutVersion) {
+        return null;
+      }
+
+      if (metaLayoutVersion) {
+        const exactCached = readInventoryMapLayoutFromBrowserCache_(requestFloor, metaLayoutVersion);
         if (exactCached) {
           if (showedCached) return null;
 
@@ -2270,6 +2361,7 @@ function loadInventoryMap(floor) {
               const merged = Object.assign({}, exactCached);
               merged.floor = requestFloor;
               merged.locationStates = statesRes && statesRes.ok ? (statesRes.locationStates || {}) : {};
+              merged.__layoutRenderReason = "cacheMissing";
               return merged;
             });
         }
@@ -2285,6 +2377,7 @@ function loadInventoryMap(floor) {
             delete layoutOnly.locationStates;
             writeInventoryMapLayoutToBrowserCache_(requestFloor, normalized.layoutVersion, layoutOnly);
           }
+          normalized.__layoutRenderReason = showedCached ? "layoutVersionChanged" : "cacheMissing";
           return normalized;
         });
     })
@@ -2303,7 +2396,7 @@ function loadInventoryMap(floor) {
       normalized.floor = requestFloor;
       currentMapState = normalized.locationStates || {};
       currentMapData = normalized;
-      renderInventoryMap(normalized, "layoutLoaded");
+      renderInventoryMap(normalized, normalized.__layoutRenderReason || (showedCached ? "layoutVersionChanged" : "cacheMissing"));
       showMapMessage("info", requestFloor === "2F" ? "2階を表示中です。" : "1階を表示中です。");
       startInventoryMapAutoRefresh_();
     })
@@ -2351,16 +2444,23 @@ function getMapCssBorderStyle_(sheetStyle) {
 function autoFitMapCellText_(div) {
   if (!div || !String(div.textContent || "").trim()) return;
 
-  let size = parseFloat(div.style.fontSize || "16") || 16;
-  const minSize = 7;
+  // 文字自動縮小は初回DOM生成直後だけ行う。
+  // 一度縮小された現在値を次回基準にしないよう、必ずシート由来の元サイズから計算する。
+  if (div.dataset && div.dataset.autoFitDone === "1") return;
 
-  // シートの文字サイズをまず反映し、セルからはみ出す場合だけ縮小する。
+  let size = parseFloat((div.dataset && div.dataset.originalFontSizePx) || div.style.fontSize || "16") || 16;
+  const minSize = 7;
   let guard = 0;
+
+  div.style.setProperty("font-size", size + "px", "important");
+
   while (size > minSize && guard < 40 && (div.scrollWidth > div.clientWidth + 1 || div.scrollHeight > div.clientHeight + 1)) {
     size -= 1;
     div.style.setProperty("font-size", size + "px", "important");
     guard++;
   }
+
+  if (div.dataset) div.dataset.autoFitDone = "1";
 }
 
 
@@ -2417,12 +2517,22 @@ function setInventoryMapBaseSize_(baseWidth, baseHeight, gridTemplateColumns, gr
     grid.dataset.originalCellHeights = JSON.stringify(currentInventoryMapOriginalLayoutMetrics_.originalCellHeights);
   }
 
-  // 元サイズは描画時だけ確定。ズーム・状態更新ではこの値を絶対に書き換えない。
+  // 元サイズは初回/許可された再描画時だけ確定。
+  // ズーム・全体表示・状態更新・resizeでは mapScale/mapGrid の width/height を書き換えない。
+  if (scale) {
+    scale.style.width = w + "px";
+    scale.style.height = h + "px";
+    scale.style.minWidth = w + "px";
+    scale.style.minHeight = h + "px";
+    scale.style.setProperty("transform-origin", "0 0", "important");
+  }
   if (grid) {
     grid.style.width = w + "px";
     grid.style.height = h + "px";
     grid.style.minWidth = w + "px";
     grid.style.minHeight = h + "px";
+    grid.style.setProperty("transform", "none", "important");
+    grid.style.setProperty("transform-origin", "0 0", "important");
   }
 }
 
@@ -2445,28 +2555,20 @@ function applyInventoryMapScaleTransform_() {
   if (!base) return;
 
   const s = Math.max(0.01, Number(mapScaleValue || 1));
-
-  // ズーム・全体表示ではセル幅・列幅・行高さ・grid-templateを絶対に変更しない。
-  // 元サイズは初回描画時に保存済みの originalGridWidth / originalGridHeight だけを使う。
   const baseWidth = Math.max(1, Math.ceil(base.width));
   const baseHeight = Math.max(1, Math.ceil(base.height));
-  const scaledWidth = Math.max(1, Math.ceil(baseWidth * s));
-  const scaledHeight = Math.max(1, Math.ceil(baseHeight * s));
 
-  // スクロール領域用のラッパーサイズだけ倍率に同期。セル自体のサイズは固定。
-  scale.style.setProperty("transform", "none", "important");
+  // ズーム・全体表示・resizeで変更するのは transform だけ。
+  // 以前はここで mapScale の width/height を倍率に合わせて毎回変更していたため、
+  // 全体表示連打・＋/－連打・表示後の遅延resizeでスクロール領域が再計算され、
+  // セル幅が細く見える/列幅が崩れる原因になっていた。
+  scale.style.setProperty("transform", "scale(" + s + ")", "important");
   scale.style.setProperty("transform-origin", "0 0", "important");
-  scale.style.width = scaledWidth + "px";
-  scale.style.height = scaledHeight + "px";
 
+  // mapScale/mapGrid の width/height は setInventoryMapBaseSize_ で初回描画時だけ固定済み。
+
+  grid.style.setProperty("transform", "none", "important");
   grid.style.setProperty("transform-origin", "0 0", "important");
-  grid.style.transform = "scale(" + s + ")";
-
-  // baseWidth/baseHeight は保存済み元サイズ。現在表示サイズを元サイズとして保存・上書きしない。
-  grid.style.width = baseWidth + "px";
-  grid.style.height = baseHeight + "px";
-  grid.style.minWidth = baseWidth + "px";
-  grid.style.minHeight = baseHeight + "px";
 }
 
 function updateInventoryMapScaleBoxSize_() {
@@ -2808,7 +2910,9 @@ function renderInventoryMapGrid_(grid, data, readOnly) {
     grid.appendChild(div);
   });
 
+  const gridRenderSeq = inventoryMapLayoutRenderSeq_;
   requestAnimationFrame(function() {
+    if (gridRenderSeq !== inventoryMapLayoutRenderSeq_) return;
     Array.prototype.forEach.call(grid.querySelectorAll(".mapCell"), autoFitMapCellText_);
     updateInventoryMapScaleBoxSize_();
   });
@@ -2832,6 +2936,7 @@ function applyMapCellSpreadsheetStyle_(div, style, isLocation, state, value) {
   div.style.setProperty("font-weight", weight, "important");
 
   var fontPx = getMapCssFontPxFromSheetPt_(style.fontSize || 12);
+  if (div.dataset) div.dataset.originalFontSizePx = String(fontPx);
   div.style.setProperty("font-size", fontPx + "px", "important");
   div.style.setProperty("line-height", "1.05", "important");
   div.style.setProperty("min-width", "0", "important");
