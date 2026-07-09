@@ -48,6 +48,10 @@ let mapPinchStartDistance = 0;
 let mapPinchStartScale = 1;
 let mapPinchCenterClientX = 0;
 let mapPinchCenterClientY = 0;
+let mapPinchStartScrollLeft = 0;
+let mapPinchStartScrollTop = 0;
+let mapPinchCenterMapX = 0;
+let mapPinchCenterMapY = 0;
 let currentMapData = null;
 let currentInventoryMarkedListActive = false;
 let currentInventoryMarkedListLocation = "";
@@ -2141,9 +2145,15 @@ function setupMapPinch_() {
   outer.addEventListener("touchstart", function(e) {
     if (e.touches && e.touches.length === 2) {
       mapPinchStartDistance = getTouchDistance_(e.touches[0], e.touches[1]);
-      mapPinchStartScale = mapScaleValue || 1;
+      mapPinchStartScale = Math.max(0.01, Number(mapScaleValue || 1));
       mapPinchCenterClientX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
       mapPinchCenterClientY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      mapPinchStartScrollLeft = outer.scrollLeft || 0;
+      mapPinchStartScrollTop = outer.scrollTop || 0;
+
+      var pinchViewportPos = getInventoryMapPointInViewport_(outer, mapPinchCenterClientX, mapPinchCenterClientY);
+      mapPinchCenterMapX = (mapPinchStartScrollLeft + pinchViewportPos.x) / mapPinchStartScale;
+      mapPinchCenterMapY = (mapPinchStartScrollTop + pinchViewportPos.y) / mapPinchStartScale;
     }
   }, { passive: true });
 
@@ -2151,16 +2161,22 @@ function setupMapPinch_() {
     if (e.touches && e.touches.length === 2 && mapPinchStartDistance) {
       e.preventDefault();
       const d = getTouchDistance_(e.touches[0], e.touches[1]);
-      const centerX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-      const centerY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
       const nextScale = Math.max(mapMinScaleValue || 0.05, Math.min(4, mapPinchStartScale * (d / mapPinchStartDistance)));
-      setInventoryMapScale_(nextScale, centerX || mapPinchCenterClientX, centerY || mapPinchCenterClientY);
+      setInventoryMapScale_(nextScale, mapPinchCenterClientX, mapPinchCenterClientY, {
+        mode: "pinch",
+        mapX: mapPinchCenterMapX,
+        mapY: mapPinchCenterMapY
+      });
     }
   }, { passive: false });
 
   outer.addEventListener("touchend", function(e) {
     if (!e.touches || e.touches.length < 2) {
       mapPinchStartDistance = 0;
+      mapPinchStartScrollLeft = 0;
+      mapPinchStartScrollTop = 0;
+      mapPinchCenterMapX = 0;
+      mapPinchCenterMapY = 0;
     }
   }, { passive: true });
 
@@ -2186,17 +2202,11 @@ function updateMapZoomLabel_() {
 }
 
 function mapZoomIn() {
-  const outer = document.getElementById("mapOuter");
-  if (!outer) return;
-  const rect = outer.getBoundingClientRect();
-  setInventoryMapScale_((mapScaleValue || 1) * 1.15, rect.left + outer.clientWidth / 2, rect.top + outer.clientHeight / 2);
+  setInventoryMapScale_((mapScaleValue || 1) * 1.15);
 }
 
 function mapZoomOut() {
-  const outer = document.getElementById("mapOuter");
-  if (!outer) return;
-  const rect = outer.getBoundingClientRect();
-  setInventoryMapScale_((mapScaleValue || 1) / 1.15, rect.left + outer.clientWidth / 2, rect.top + outer.clientHeight / 2);
+  setInventoryMapScale_((mapScaleValue || 1) / 1.15);
 }
 
 function mapFitWhole() {
@@ -2207,6 +2217,20 @@ function getTouchDistance_(a, b) {
   const dx = a.clientX - b.clientX;
   const dy = a.clientY - b.clientY;
   return Math.sqrt(dx * dx + dy * dy);
+}
+
+function getInventoryMapPointInViewport_(outer, clientX, clientY) {
+  if (!outer) return { x: 0, y: 0 };
+
+  try {
+    const rect = outer.getBoundingClientRect();
+    return {
+      x: Math.max(0, Number(clientX || 0) - rect.left),
+      y: Math.max(0, Number(clientY || 0) - rect.top)
+    };
+  } catch (e) {
+    return { x: 0, y: 0 };
+  }
 }
 
 document.addEventListener("DOMContentLoaded", function() {
@@ -2547,10 +2571,21 @@ function setInventoryMapBaseSize_(baseWidth, baseHeight, gridTemplateColumns, gr
 function clampInventoryMapScroll_() {
   const outer = document.getElementById("mapOuter");
   if (!outer) return;
-  const maxLeft = Math.max(0, outer.scrollWidth - outer.clientWidth);
-  const maxTop = Math.max(0, outer.scrollHeight - outer.clientHeight);
+
+  const base = getInventoryMapBaseSize_();
+  const viewport = getInventoryMapOuterViewportSize_();
+  if (!base || !viewport) return;
+
+  const s = Math.max(0.01, Number(mapScaleValue || 1));
+  const scaledW = Math.max(1, Math.ceil(Number(base.width || 1) * s));
+  const scaledH = Math.max(1, Math.ceil(Number(base.height || 1) * s));
+  const maxLeft = Math.max(0, scaledW - viewport.width);
+  const maxTop = Math.max(0, scaledH - viewport.height);
+
   if (outer.scrollLeft > maxLeft) outer.scrollLeft = maxLeft;
   if (outer.scrollTop > maxTop) outer.scrollTop = maxTop;
+  if (outer.scrollLeft < 0) outer.scrollLeft = 0;
+  if (outer.scrollTop < 0) outer.scrollTop = 0;
 }
 
 
@@ -2597,19 +2632,25 @@ function applyInventoryMapScaleTransform_() {
   const s = Math.max(0.01, Number(mapScaleValue || 1));
   const baseWidth = Math.max(1, Math.ceil(base.width));
   const baseHeight = Math.max(1, Math.ceil(base.height));
+  const scaledWidth = Math.max(1, Math.ceil(baseWidth * s));
+  const scaledHeight = Math.max(1, Math.ceil(baseHeight * s));
 
-  // ズーム・全体表示で変更するのは transform とスクロール位置だけ。
-  // mapScale / mapGrid の width・height は setInventoryMapBaseSize_() で初回描画時だけ固定する。
+  // transform は見た目だけを拡大縮小するため、スクロール領域用の外側ラッパーだけを倍率後サイズへ同期する。
+  // mapGrid 本体の幅・高さ・列幅・行高さ・結合情報はここでは変更しない。
   var tx = 0;
   var ty = 0;
   if (inventoryMapFitMode_ && outer) {
     var viewport = getInventoryMapOuterViewportSize_();
     if (viewport) {
-      tx = Math.max(0, Math.round(viewport.paddingLeft + (viewport.width - baseWidth * s) / 2));
-      ty = Math.max(0, Math.round(viewport.paddingTop + (viewport.height - baseHeight * s) / 2));
+      tx = Math.max(0, Math.round(viewport.paddingLeft + (viewport.width - scaledWidth) / 2));
+      ty = Math.max(0, Math.round(viewport.paddingTop + (viewport.height - scaledHeight) / 2));
     }
   }
 
+  scale.style.width = scaledWidth + "px";
+  scale.style.height = scaledHeight + "px";
+  scale.style.minWidth = scaledWidth + "px";
+  scale.style.minHeight = scaledHeight + "px";
   scale.style.setProperty("transform", "translate(" + tx + "px, " + ty + "px) scale(" + s + ")", "important");
   scale.style.setProperty("transform-origin", "0 0", "important");
 
@@ -2650,7 +2691,7 @@ function fitInventoryMapToScreen_() {
   updateMapZoomLabel_();
 }
 
-function setInventoryMapScale_(nextScale, centerClientX, centerClientY) {
+function setInventoryMapScale_(nextScale, centerClientX, centerClientY, options) {
   const outer = document.getElementById("mapOuter");
   const scale = document.getElementById("mapScale");
   if (!outer || !scale) return;
@@ -2663,12 +2704,21 @@ function setInventoryMapScale_(nextScale, centerClientX, centerClientY) {
   // 小数点誤差が次回の基準へ蓄積しないよう、倍率だけを丸めて管理する。
   nextScale = Math.round(nextScale * 10000) / 10000;
 
-  const rect = outer.getBoundingClientRect();
-  const centerX = Number.isFinite(centerClientX) ? centerClientX - rect.left : outer.clientWidth / 2;
-  const centerY = Number.isFinite(centerClientY) ? centerClientY - rect.top : outer.clientHeight / 2;
+  const viewport = getInventoryMapOuterViewportSize_();
+  let centerX = viewport ? viewport.width / 2 : 0;
+  let centerY = viewport ? viewport.height / 2 : 0;
+  let contentX = (outer.scrollLeft + centerX) / oldScale;
+  let contentY = (outer.scrollTop + centerY) / oldScale;
 
-  const contentX = (outer.scrollLeft + centerX) / oldScale;
-  const contentY = (outer.scrollTop + centerY) / oldScale;
+  // ピンチズームだけは、開始時に保存した「指でつまんだマップ上の位置」を基準にする。
+  // ＋/－ボタンは従来通り画面中央基準、全体表示は fitInventoryMapToScreen_ の中央寄せを維持する。
+  if (options && options.mode === "pinch") {
+    const pinchViewportPos = getInventoryMapPointInViewport_(outer, centerClientX, centerClientY);
+    centerX = pinchViewportPos.x;
+    centerY = pinchViewportPos.y;
+    contentX = Number(options.mapX || 0);
+    contentY = Number(options.mapY || 0);
+  }
 
   mapScaleValue = nextScale;
   applyInventoryMapScaleTransform_();
@@ -2861,30 +2911,13 @@ function renderInventoryMapGrid_(grid, data, readOnly) {
   var mapped = cells.map(mappedCellInfo_);
   var displayRows = portraitMap ? cols : rows;
   var displayCols = portraitMap ? rows : cols;
-  var minRow = displayRows + 1;
-  var minCol = displayCols + 1;
-  var maxRow = 0;
-  var maxCol = 0;
 
-  mapped.forEach(function(info) {
-    if (!info.meaningful) return;
-    minRow = Math.min(minRow, info.rowStart);
-    minCol = Math.min(minCol, info.colStart);
-    maxRow = Math.max(maxRow, info.rowStart + info.rowSpan - 1);
-    maxCol = Math.max(maxCol, info.colStart + info.colSpan - 1);
-  });
-
-  if (!maxRow || !maxCol) {
-    minRow = 1;
-    minCol = 1;
-    maxRow = displayRows;
-    maxCol = displayCols;
-  }
-
-  minRow = Math.max(1, Math.min(displayRows, minRow));
-  minCol = Math.max(1, Math.min(displayCols, minCol));
-  maxRow = Math.max(minRow, Math.min(displayRows, maxRow));
-  maxCol = Math.max(minCol, Math.min(displayCols, maxCol));
+  // 元スプレッドシート上の row / col / rowSpan / colSpan を詰めずに CSS grid へ反映する。
+  // 線だけセル・枠線だけセルの追加で、固定文字セルやロケセルの基準行/列がズレないようにする。
+  var minRow = 1;
+  var minCol = 1;
+  var maxRow = displayRows;
+  var maxCol = displayCols;
 
   var colTrackSizes;
   var rowTrackSizes;
@@ -3020,6 +3053,16 @@ function applyMapCellSpreadsheetStyle_(div, style, isLocation, state, value) {
   applyMapCellBorderStyle_(div, style);
 }
 
+function isVisibleMapBorderSide_(border) {
+  if (!border) return false;
+  return !!(
+    border.visible ||
+    Number(border.width || 0) > 0 ||
+    String(border.color || "").trim() ||
+    String(border.style || "").trim()
+  );
+}
+
 function applyMapCellBorderStyle_(div, style) {
   style = style || {};
   var borders = style && style.borders ? style.borders : null;
@@ -3027,7 +3070,7 @@ function applyMapCellBorderStyle_(div, style) {
   ["top", "right", "bottom", "left"].forEach(function(side) {
     var border = borders ? (borders[side] || {}) : null;
 
-    if (border && border.visible) {
+    if (isVisibleMapBorderSide_(border)) {
       div.style.setProperty("border-" + side + "-style", getMapCssBorderStyle_(border.style), "important");
       div.style.setProperty("border-" + side + "-width", String(border.width || 1) + "px", "important");
       div.style.setProperty("border-" + side + "-color", border.color || style.borderColor || "#4b5563", "important");
