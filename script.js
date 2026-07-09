@@ -58,6 +58,7 @@ let currentInventoryMarkedListLocation = "";
 let currentInventoryMarkedListTitle = "";
 let currentInventoryBackButtonLabel = "記入済商品一覧へ戻る";
 const INVENTORY_MAP_VIEW_PADDING_PX = 0;
+const INVENTORY_MAP_CACHE_SCHEMA_VERSION = 9;
 let currentInventoryMapLayoutSignature_ = "";
 let currentInventoryMapOriginalLayoutMetrics_ = null;
 let inventoryMapStateRefreshTimer_ = null;
@@ -2265,6 +2266,11 @@ function readInventoryMapLayoutFromBrowserCache_(floor, version) {
     if (!raw) return null;
     const data = JSON.parse(raw);
     if (!data || String(data.layoutVersion || "") !== String(version || "")) return null;
+
+    // 高速表示を優先するため、古いschemaのキャッシュも破棄しない。
+    // 古い相対row/colキャッシュは normalizeInventoryMapResponse_ 側で元シート基準へ補正し、
+    // 裏で最新schemaへ更新する。
+    data.__cacheSchema = Number(data.cacheSchema || data.__cacheSchema || 0);
     return data;
   } catch (e) {
     return null;
@@ -2275,14 +2281,14 @@ function readLatestInventoryMapLayoutFromBrowserCache_(floor) {
   try {
     const latestKey = localStorage.getItem("inventoryMapLayoutLatest:" + String(floor || "1F"));
     if (!latestKey) return null;
-    // 線だけセル・枠線だけセル対応前の古いブラウザキャッシュを使うと、
-    // 罫線セル欠落や下端固定文字の位置ズレが残るため、現在のキャッシュキーだけを採用する。
-    const expectedPrefix = getInventoryMapCacheKey_(floor, "").replace(/:$/, "");
-    if (String(latestKey).indexOf(expectedPrefix) !== 0) return null;
     const raw = localStorage.getItem(latestKey);
     if (!raw) return null;
     const data = JSON.parse(raw);
     if (!data || !data.ok) return null;
+
+    // 既存ユーザーの高速表示を維持するため、旧キャッシュでも先に即表示する。
+    // ただし cacheSchema が古い場合は loadInventoryMap 側で裏でフル取得して、新しい線だけセル対応キャッシュへ更新する。
+    data.__cacheSchema = Number(data.cacheSchema || data.__cacheSchema || 0);
     return data;
   } catch (e) {
     return null;
@@ -2292,7 +2298,9 @@ function readLatestInventoryMapLayoutFromBrowserCache_(floor) {
 function writeInventoryMapLayoutToBrowserCache_(floor, version, data) {
   try {
     const key = getInventoryMapCacheKey_(floor, version);
-    localStorage.setItem(key, JSON.stringify(data));
+    const layoutData = Object.assign({}, data || {});
+    layoutData.cacheSchema = INVENTORY_MAP_CACHE_SCHEMA_VERSION;
+    localStorage.setItem(key, JSON.stringify(layoutData));
     localStorage.setItem("inventoryMapLayoutLatest:" + String(floor || "1F"), key);
   } catch (e) {}
 }
@@ -2333,12 +2341,14 @@ function loadInventoryMap(floor) {
   const cachedLayout = readLatestInventoryMapLayoutFromBrowserCache_(requestFloor);
   let showedCached = false;
   let cachedLayoutVersion = "";
+  let cachedLayoutSchema = 0;
 
   if (cachedLayout) {
     const cachedNormalized = normalizeInventoryMapResponse_(Object.assign({}, cachedLayout));
     cachedNormalized.floor = requestFloor;
     cachedNormalized.locationStates = currentMapState || {};
     cachedLayoutVersion = String(cachedNormalized.layoutVersion || "");
+    cachedLayoutSchema = Number(cachedLayout.__cacheSchema || cachedLayout.cacheSchema || 0);
     currentMapData = cachedNormalized;
     renderInventoryMap(cachedNormalized, layoutReasonForFirstRender);
     showMapMessage("info", requestFloor === "2F" ? "2階を表示中です。" : "1階を表示中です。");
@@ -2370,7 +2380,13 @@ function loadInventoryMap(floor) {
 
       // キャッシュ表示済みで、棚マップ更新日時が変わっていない場合はフルマップを取得しない。
       // これにより、表示後約10秒前後の裏通信完了で renderInventoryMapGrid_ が再実行される経路を遮断する。
-      if (showedCached && cachedLayoutVersion && metaLayoutVersion && metaLayoutVersion === cachedLayoutVersion) {
+      if (
+        showedCached &&
+        cachedLayoutSchema >= INVENTORY_MAP_CACHE_SCHEMA_VERSION &&
+        cachedLayoutVersion &&
+        metaLayoutVersion &&
+        metaLayoutVersion === cachedLayoutVersion
+      ) {
         return null;
       }
 
@@ -2786,16 +2802,47 @@ function getInventoryMapStateForLocation_(stateMap, value) {
 }
 
 function getInventoryMapCacheKey_(floor, version) {
-  return "inventoryMapLayout:v8:" + String(floor || "1F") + ":" + String(version || "");
+  return "inventoryMapLayout:v" + INVENTORY_MAP_CACHE_SCHEMA_VERSION + ":" + String(floor || "1F") + ":" + String(version || "");
+}
+
+function normalizeLegacyInventoryMapCoordinate_(value, start) {
+  var n = Number(value || 1);
+  var s = Number(start || 1);
+  if (!isFinite(n) || n < 1) n = 1;
+  if (!isFinite(s) || s < 1) s = 1;
+  return n + s - 1;
 }
 
 function normalizeInventoryMapResponse_(res) {
   if (!res || !res.ok) return res;
 
   if (!res.compact) {
+    var sr0 = Number(res.startRow || 1);
+    var sc0 = Number(res.startCol || 1);
     res.layoutVersion = res.layoutVersion || res.v || "";
+
+    // 旧キャッシュでは、セルrow/colが有効範囲内の相対座標で保存されていた。
+    // そのまま描画すると下側の「シャッター」「ドア」や線だけセルが上へ詰まるため、
+    // キャッシュ復元時点で元スプレッドシートの絶対row/colへ戻す。
+    if ((sr0 > 1 || sc0 > 1) && !res.__absoluteCoordinateNormalized) {
+      (res.cells || []).forEach(function(cell) {
+        if (!cell) return;
+        cell.row = normalizeLegacyInventoryMapCoordinate_(cell.row, sr0);
+        cell.col = normalizeLegacyInventoryMapCoordinate_(cell.col, sc0);
+      });
+      res.rowHeights = new Array(Math.max(0, sr0 - 1)).fill(36).concat(res.rowHeights || []);
+      res.colWidths = new Array(Math.max(0, sc0 - 1)).fill(64).concat(res.colWidths || []);
+      res.rows = Math.max(Number(res.rows || 1), sr0 + Number(res.rows || 1) - 1);
+      res.cols = Math.max(Number(res.cols || 1), sc0 + Number(res.cols || 1) - 1);
+      res.startRow = 1;
+      res.startCol = 1;
+      res.__absoluteCoordinateNormalized = true;
+    }
     return res;
   }
+
+  var compactStartRow = Number(res.sr || res.startRow || 1);
+  var compactStartCol = Number(res.sc || res.startCol || 1);
 
   var styles = (res.st || []).map(function(s) {
     var b = s && s[6] ? s[6] : null;
@@ -2810,11 +2857,14 @@ function normalizeInventoryMapResponse_(res) {
     };
   });
 
+  var compactRowHeights = new Array(Math.max(0, compactStartRow - 1)).fill(36).concat(res.rh || res.rowHeights || []);
+  var compactColWidths = new Array(Math.max(0, compactStartCol - 1)).fill(64).concat(res.cw || res.colWidths || []);
+
   var cells = (res.ce || []).map(function(c) {
     var styleIndex = Number(c[6] || 0);
     return {
-      row: Number(c[0] || 1),
-      col: Number(c[1] || 1),
+      row: normalizeLegacyInventoryMapCoordinate_(c[0], compactStartRow),
+      col: normalizeLegacyInventoryMapCoordinate_(c[1], compactStartCol),
       rowspan: Number(c[2] || 1),
       colspan: Number(c[3] || 1),
       value: c[4] || "",
@@ -2829,14 +2879,14 @@ function normalizeInventoryMapResponse_(res) {
     floor: res.f || res.floor || currentMapFloor || "1F",
     sheetName: res.sn || res.sheetName || "",
     layoutVersion: res.v || res.layoutVersion || "",
-    rows: Number(res.r || res.rows || 1),
-    cols: Number(res.c || res.cols || 1),
+    rows: Math.max(Number(res.r || res.rows || 1), compactStartRow + Number(res.r || res.rows || 1) - 1),
+    cols: Math.max(Number(res.c || res.cols || 1), compactStartCol + Number(res.c || res.cols || 1) - 1),
     originalRows: Number(res.or || res.originalRows || 1),
     originalCols: Number(res.oc || res.originalCols || 1),
     startRow: Number(res.sr || res.startRow || 1),
     startCol: Number(res.sc || res.startCol || 1),
-    rowHeights: res.rh || res.rowHeights || [],
-    colWidths: res.cw || res.colWidths || [],
+    rowHeights: compactRowHeights,
+    colWidths: compactColWidths,
     cells: cells,
     locationStates: res.locationStates || {}
   };
