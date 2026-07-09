@@ -2152,8 +2152,9 @@ function setupMapPinch_() {
       mapPinchStartScrollTop = outer.scrollTop || 0;
 
       var pinchViewportPos = getInventoryMapPointInViewport_(outer, mapPinchCenterClientX, mapPinchCenterClientY);
-      mapPinchCenterMapX = (mapPinchStartScrollLeft + pinchViewportPos.x) / mapPinchStartScale;
-      mapPinchCenterMapY = (mapPinchStartScrollTop + pinchViewportPos.y) / mapPinchStartScale;
+      var currentTranslate = getInventoryMapCurrentGridTranslate_();
+      mapPinchCenterMapX = (mapPinchStartScrollLeft + pinchViewportPos.x - currentTranslate.x) / mapPinchStartScale;
+      mapPinchCenterMapY = (mapPinchStartScrollTop + pinchViewportPos.y - currentTranslate.y) / mapPinchStartScale;
     }
   }, { passive: true });
 
@@ -2274,6 +2275,10 @@ function readLatestInventoryMapLayoutFromBrowserCache_(floor) {
   try {
     const latestKey = localStorage.getItem("inventoryMapLayoutLatest:" + String(floor || "1F"));
     if (!latestKey) return null;
+    // 線だけセル・枠線だけセル対応前の古いブラウザキャッシュを使うと、
+    // 罫線セル欠落や下端固定文字の位置ズレが残るため、現在のキャッシュキーだけを採用する。
+    const expectedPrefix = getInventoryMapCacheKey_(floor, "").replace(/:$/, "");
+    if (String(latestKey).indexOf(expectedPrefix) !== 0) return null;
     const raw = localStorage.getItem(latestKey);
     if (!raw) return null;
     const data = JSON.parse(raw);
@@ -2579,8 +2584,10 @@ function clampInventoryMapScroll_() {
   const s = Math.max(0.01, Number(mapScaleValue || 1));
   const scaledW = Math.max(1, Math.ceil(Number(base.width || 1) * s));
   const scaledH = Math.max(1, Math.ceil(Number(base.height || 1) * s));
-  const maxLeft = Math.max(0, scaledW - viewport.width);
-  const maxTop = Math.max(0, scaledH - viewport.height);
+  const wrapperW = inventoryMapFitMode_ ? Math.max(scaledW, Math.floor(viewport.width)) : scaledW;
+  const wrapperH = inventoryMapFitMode_ ? Math.max(scaledH, Math.floor(viewport.height)) : scaledH;
+  const maxLeft = Math.max(0, wrapperW - viewport.width);
+  const maxTop = Math.max(0, wrapperH - viewport.height);
 
   if (outer.scrollLeft > maxLeft) outer.scrollLeft = maxLeft;
   if (outer.scrollTop > maxTop) outer.scrollTop = maxTop;
@@ -2620,10 +2627,18 @@ function parseCssPixelValue_(value) {
   return Number.isFinite(n) ? n : 0;
 }
 
+function getInventoryMapCurrentGridTranslate_() {
+  const grid = document.getElementById("mapGrid");
+  if (!grid || !grid.dataset) return { x: 0, y: 0 };
+  return {
+    x: Number(grid.dataset.mapTranslateX || 0) || 0,
+    y: Number(grid.dataset.mapTranslateY || 0) || 0
+  };
+}
+
 function applyInventoryMapScaleTransform_() {
   const scale = document.getElementById("mapScale");
   const grid = document.getElementById("mapGrid");
-  const outer = document.getElementById("mapOuter");
   if (!scale || !grid) return;
 
   const base = getInventoryMapBaseSize_();
@@ -2635,27 +2650,38 @@ function applyInventoryMapScaleTransform_() {
   const scaledWidth = Math.max(1, Math.ceil(baseWidth * s));
   const scaledHeight = Math.max(1, Math.ceil(baseHeight * s));
 
-  // transform は見た目だけを拡大縮小するため、スクロール領域用の外側ラッパーだけを倍率後サイズへ同期する。
-  // mapGrid 本体の幅・高さ・列幅・行高さ・結合情報はここでは変更しない。
+  var wrapperWidth = scaledWidth;
+  var wrapperHeight = scaledHeight;
   var tx = 0;
   var ty = 0;
-  if (inventoryMapFitMode_ && outer) {
+
+  if (inventoryMapFitMode_) {
     var viewport = getInventoryMapOuterViewportSize_();
     if (viewport) {
-      tx = Math.max(0, Math.round(viewport.paddingLeft + (viewport.width - scaledWidth) / 2));
-      ty = Math.max(0, Math.round(viewport.paddingTop + (viewport.height - scaledHeight) / 2));
+      wrapperWidth = Math.max(scaledWidth, Math.floor(viewport.width));
+      wrapperHeight = Math.max(scaledHeight, Math.floor(viewport.height));
+      tx = Math.max(0, Math.round((wrapperWidth - scaledWidth) / 2));
+      ty = Math.max(0, Math.round((wrapperHeight - scaledHeight) / 2));
     }
   }
 
-  scale.style.width = scaledWidth + "px";
-  scale.style.height = scaledHeight + "px";
-  scale.style.minWidth = scaledWidth + "px";
-  scale.style.minHeight = scaledHeight + "px";
-  scale.style.setProperty("transform", "translate(" + tx + "px, " + ty + "px) scale(" + s + ")", "important");
+  // mapScale はスクロール領域だけを担当し、transform を掛けない。
+  // mapScale のサイズと transform translate/scale を二重に効かせると、初期表示・全体表示で右寄りに見える。
+  scale.style.width = wrapperWidth + "px";
+  scale.style.height = wrapperHeight + "px";
+  scale.style.minWidth = wrapperWidth + "px";
+  scale.style.minHeight = wrapperHeight + "px";
+  scale.style.setProperty("transform", "none", "important");
   scale.style.setProperty("transform-origin", "0 0", "important");
 
-  grid.style.setProperty("transform", "none", "important");
+  // mapGrid の元レイアウト幅・高さ・列幅・行高さは変更しない。
+  // 見た目の拡大縮小と、全体表示時の中央配置だけを transform で行う。
+  grid.style.setProperty("transform", "translate(" + tx + "px, " + ty + "px) scale(" + s + ")", "important");
   grid.style.setProperty("transform-origin", "0 0", "important");
+  if (grid.dataset) {
+    grid.dataset.mapTranslateX = String(tx);
+    grid.dataset.mapTranslateY = String(ty);
+  }
 }
 
 function updateInventoryMapScaleBoxSize_() {
@@ -2705,10 +2731,11 @@ function setInventoryMapScale_(nextScale, centerClientX, centerClientY, options)
   nextScale = Math.round(nextScale * 10000) / 10000;
 
   const viewport = getInventoryMapOuterViewportSize_();
+  const currentTranslate = getInventoryMapCurrentGridTranslate_();
   let centerX = viewport ? viewport.width / 2 : 0;
   let centerY = viewport ? viewport.height / 2 : 0;
-  let contentX = (outer.scrollLeft + centerX) / oldScale;
-  let contentY = (outer.scrollTop + centerY) / oldScale;
+  let contentX = (outer.scrollLeft + centerX - currentTranslate.x) / oldScale;
+  let contentY = (outer.scrollTop + centerY - currentTranslate.y) / oldScale;
 
   // ピンチズームだけは、開始時に保存した「指でつまんだマップ上の位置」を基準にする。
   // ＋/－ボタンは従来通り画面中央基準、全体表示は fitInventoryMapToScreen_ の中央寄せを維持する。
@@ -2759,7 +2786,7 @@ function getInventoryMapStateForLocation_(stateMap, value) {
 }
 
 function getInventoryMapCacheKey_(floor, version) {
-  return "inventoryMapLayout:v7:" + String(floor || "1F") + ":" + String(version || "");
+  return "inventoryMapLayout:v8:" + String(floor || "1F") + ":" + String(version || "");
 }
 
 function normalizeInventoryMapResponse_(res) {
@@ -3066,6 +3093,8 @@ function isVisibleMapBorderSide_(border) {
 function applyMapCellBorderStyle_(div, style) {
   style = style || {};
   var borders = style && style.borders ? style.borders : null;
+  var hasVisibleSideBorder = hasAnyVisibleMapBorder_(borders);
+  var useFallbackFullBorder = !!(style.hasBorder && !hasVisibleSideBorder);
 
   ["top", "right", "bottom", "left"].forEach(function(side) {
     var border = borders ? (borders[side] || {}) : null;
@@ -3074,11 +3103,9 @@ function applyMapCellBorderStyle_(div, style) {
       div.style.setProperty("border-" + side + "-style", getMapCssBorderStyle_(border.style), "important");
       div.style.setProperty("border-" + side + "-width", String(border.width || 1) + "px", "important");
       div.style.setProperty("border-" + side + "-color", border.color || style.borderColor || "#4b5563", "important");
-    } else if (borders) {
-      div.style.setProperty("border-" + side + "-style", "solid", "important");
-      div.style.setProperty("border-" + side + "-width", "0px", "important");
-      div.style.setProperty("border-" + side + "-color", "transparent", "important");
-    } else if (style.hasBorder) {
+    } else if (useFallbackFullBorder) {
+      // Apps Script 側/古いキャッシュで hasBorder=true だが辺別 borders が欠けている場合も、
+      // 線だけセル・枠線だけセルを空白セルとして消さずに表示する。
       div.style.setProperty("border-" + side + "-style", "solid", "important");
       div.style.setProperty("border-" + side + "-width", "1px", "important");
       div.style.setProperty("border-" + side + "-color", style.borderColor || "#4b5563", "important");
