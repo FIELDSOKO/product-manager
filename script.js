@@ -53,7 +53,7 @@ let currentInventoryMarkedListActive = false;
 let currentInventoryMarkedListLocation = "";
 let currentInventoryMarkedListTitle = "";
 let currentInventoryBackButtonLabel = "記入済商品一覧へ戻る";
-const INVENTORY_MAP_VIEW_PADDING_PX = 42;
+const INVENTORY_MAP_VIEW_PADDING_PX = 0;
 let currentInventoryMapLayoutSignature_ = "";
 let currentInventoryMapOriginalLayoutMetrics_ = null;
 let inventoryMapStateRefreshTimer_ = null;
@@ -2554,6 +2554,37 @@ function clampInventoryMapScroll_() {
 }
 
 
+function getInventoryMapOuterViewportSize_() {
+  const outer = document.getElementById("mapOuter");
+  if (!outer || !window.getComputedStyle) return null;
+
+  // 全体表示・全画面表示の倍率計算に使う表示領域。
+  // 禁止された getBoundingClientRect / offsetWidth / clientWidth / scrollWidth / scale後サイズは使わず、
+  // CSSで確定済みの実表示サイズ（computed style の width/height）だけを使う。
+  // この値は元レイアウトサイズとして保存せず、倍率算出用の一時値としてのみ使用する。
+  const style = window.getComputedStyle(outer);
+  const outerW = parseCssPixelValue_(style.width);
+  const outerH = parseCssPixelValue_(style.height);
+  if (!(outerW > 0) || !(outerH > 0)) return null;
+
+  const padL = parseCssPixelValue_(style.paddingLeft);
+  const padR = parseCssPixelValue_(style.paddingRight);
+  const padT = parseCssPixelValue_(style.paddingTop);
+  const padB = parseCssPixelValue_(style.paddingBottom);
+
+  return {
+    width: Math.max(1, outerW - padL - padR),
+    height: Math.max(1, outerH - padT - padB),
+    paddingLeft: padL,
+    paddingTop: padT
+  };
+}
+
+function parseCssPixelValue_(value) {
+  const n = parseFloat(String(value || "0"));
+  return Number.isFinite(n) ? n : 0;
+}
+
 function applyInventoryMapScaleTransform_() {
   const scale = document.getElementById("mapScale");
   const grid = document.getElementById("mapGrid");
@@ -2567,13 +2598,16 @@ function applyInventoryMapScaleTransform_() {
   const baseWidth = Math.max(1, Math.ceil(base.width));
   const baseHeight = Math.max(1, Math.ceil(base.height));
 
-  // ズーム・全体表示で変更するのは transform だけ。
+  // ズーム・全体表示で変更するのは transform とスクロール位置だけ。
   // mapScale / mapGrid の width・height は setInventoryMapBaseSize_() で初回描画時だけ固定する。
   var tx = 0;
   var ty = 0;
   if (inventoryMapFitMode_ && outer) {
-    tx = Math.max(0, Math.round((outer.clientWidth - baseWidth * s) / 2));
-    ty = Math.max(0, Math.round((outer.clientHeight - baseHeight * s) / 2));
+    var viewport = getInventoryMapOuterViewportSize_();
+    if (viewport) {
+      tx = Math.max(0, Math.round(viewport.paddingLeft + (viewport.width - baseWidth * s) / 2));
+      ty = Math.max(0, Math.round(viewport.paddingTop + (viewport.height - baseHeight * s) / 2));
+    }
   }
 
   scale.style.setProperty("transform", "translate(" + tx + "px, " + ty + "px) scale(" + s + ")", "important");
@@ -2600,8 +2634,10 @@ function fitInventoryMapToScreen_() {
   // getBoundingClientRect / offsetWidth / clientWidth を元サイズとして保存しない。
   const rawW = Math.max(1, Number(base.width || 1));
   const rawH = Math.max(1, Number(base.height || 1));
-  const availableW = Math.max(1, outer.clientWidth - 24);
-  const availableH = Math.max(1, outer.clientHeight - 24);
+  const viewport = getInventoryMapOuterViewportSize_();
+  if (!viewport) return;
+  const availableW = viewport.width;
+  const availableH = viewport.height;
   const nextScale = Math.round(Math.min(1, availableW / rawW, availableH / rawH) * 10000) / 10000;
 
   mapMinScaleValue = Math.max(0.03, nextScale);
@@ -2938,7 +2974,9 @@ function renderInventoryMapGrid_(grid, data, readOnly) {
   const gridRenderSeq = inventoryMapLayoutRenderSeq_;
   requestAnimationFrame(function() {
     if (gridRenderSeq !== inventoryMapLayoutRenderSeq_) return;
-    Array.prototype.forEach.call(grid.querySelectorAll(".mapCell"), autoFitMapCellText_);
+    // 固定文字セルは初回描画後も文字サイズ・行高・paddingを再計算しない。
+    // 自動縮小対象はロケ状態セルだけに限定する。
+    Array.prototype.forEach.call(grid.querySelectorAll(".mapCell[data-map-location-key]"), autoFitMapCellText_);
     updateInventoryMapScaleBoxSize_();
   });
 
@@ -2962,16 +3000,22 @@ function applyMapCellSpreadsheetStyle_(div, style, isLocation, state, value) {
 
   var fontPx = getMapCssFontPxFromSheetPt_(style.fontSize || 12);
   var hasText = !!String(value || "").trim();
+  var isFixedTextCell = !isLocation && hasText;
   if (div.dataset) {
     div.dataset.originalFontSizePx = String(fontPx);
-    div.dataset.fixedTextCell = (!isLocation && hasText) ? "1" : "0";
+    div.dataset.fixedTextCell = isFixedTextCell ? "1" : "0";
   }
   div.style.setProperty("font-size", fontPx + "px", "important");
-  div.style.setProperty("line-height", (!isLocation && hasText) ? "1.22" : "1.12", "important");
+  // 固定文字セルはズーム・全体表示・状態更新で再計算しない前提で、px固定の行高にする。
+  // line-height: 1.xx の相対値にすると端末/倍率で丸め差が出て文字が重なって見える場合がある。
+  div.style.setProperty("line-height", isFixedTextCell ? Math.ceil(fontPx * 1.28) + "px" : "1.12", "important");
   div.style.setProperty("min-width", "0", "important");
   div.style.setProperty("min-height", "0", "important");
   div.style.setProperty("border-radius", "0", "important");
-  div.style.setProperty("padding", "1px", "important");
+  div.style.setProperty("padding", isFixedTextCell ? "0px" : "1px", "important");
+  if (isFixedTextCell) {
+    div.classList.add("mapCellFixedText");
+  }
 
   applyMapCellBorderStyle_(div, style);
 }

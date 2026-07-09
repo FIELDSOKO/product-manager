@@ -497,6 +497,15 @@ button {
   font-size: clamp(9px, 2.6vw, 14px);
 }
 
+.mapCellFixedText {
+  align-items: center !important;
+  justify-content: center !important;
+  white-space: pre-wrap !important;
+  word-break: keep-all !important;
+  overflow-wrap: normal !important;
+  transform: none !important;
+}
+
 .mapCellHasBorder {
   border-style: solid;
 }
