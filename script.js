@@ -73,6 +73,8 @@ const inventoryMapBackgroundPreparePromises_ = {};
 let commonActionConfirmCallback_ = null;
 let inventorySearchListReturnAvailable_ = false;
 let inventorySearchListReturnScrollY_ = 0;
+let selectedInventorySearchListItemRef_ = null;
+let selectedInventorySearchListStatusEl_ = null;
 
 function initApp_() {
   setAppVersion();
@@ -1468,6 +1470,8 @@ function inventoryClearDisplayOnly_() {
   selectedInventoryItem = null;
   inventorySearchListReturnAvailable_ = false;
   inventorySearchListReturnScrollY_ = 0;
+  selectedInventorySearchListItemRef_ = null;
+  selectedInventorySearchListStatusEl_ = null;
   currentInventoryMarkedListActive = false;
   currentInventoryMarkedListLocation = "";
   currentInventoryMarkedListTitle = "";
@@ -1651,6 +1655,20 @@ function inventorySetCurrentStatus_(status) {
       selectedInventoryItem = Object.assign({}, selectedInventoryItem, res.item);
     }
     selectedInventoryItem.inventoryStatus = status === "記入済" ? "記入済" : "";
+
+    if (!currentInventoryMarkedListActive && selectedInventorySearchListItemRef_) {
+      if (res.item) {
+        Object.assign(selectedInventorySearchListItemRef_, res.item);
+      }
+      selectedInventorySearchListItemRef_.inventoryStatus =
+        status === "記入済" ? "記入済" : "";
+
+      if (selectedInventorySearchListStatusEl_) {
+        selectedInventorySearchListStatusEl_.textContent =
+          selectedInventorySearchListItemRef_.inventoryStatus || "未記入";
+      }
+    }
+
     inventorySelectItem(selectedInventoryItem);
 
     if (status !== "記入済" && currentInventoryMarkedListActive) {
@@ -1779,10 +1797,16 @@ function inventoryRenderList(items, title, keepReturnState) {
       "<div><strong>" + escapeHtml(item.hinban) + "</strong> / " + escapeHtml(item.name) + "</div>" +
       "<div class=\"small\">JAN：" + escapeHtml(item.jan) + "</div>" +
       "<div class=\"small\">色：" + escapeHtml(item.color) + " / サイズ：" + escapeHtml(item.size) + "</div>" +
-      "<div class=\"small\">現在ロケ：" + escapeHtml(item.location || "未設定") + " / 状態：" + escapeHtml(item.inventoryStatus || "未記入") + "</div>";
+      "<div class=\"small\">現在ロケ：" + escapeHtml(item.location || "未設定") +
+      " / 状態：<span class=\"inventoryListItemStatus\">" +
+      escapeHtml(item.inventoryStatus || "未記入") + "</span></div>";
     div.onclick = function() {
       inventorySearchListReturnAvailable_ = !currentInventoryMarkedListActive;
       inventorySearchListReturnScrollY_ = window.scrollY || document.documentElement.scrollTop || 0;
+      selectedInventorySearchListItemRef_ = currentInventoryMarkedListActive ? null : item;
+      selectedInventorySearchListStatusEl_ = currentInventoryMarkedListActive
+        ? null
+        : div.querySelector(".inventoryListItemStatus");
       inventorySelectItem(item);
       card.classList.add("hidden");
     };
@@ -1822,6 +1846,8 @@ function inventoryRenderGroupedList(groups, title) {
         "<div class=\"small\">色：" + escapeHtml(item.color) + " / サイズ：" + escapeHtml(item.size) + "</div>" +
         "<div class=\"small\">タップして詳細表示・記入済解除できます。</div>";
       div.onclick = function() {
+        selectedInventorySearchListItemRef_ = null;
+        selectedInventorySearchListStatusEl_ = null;
         inventorySelectItem(Object.assign({}, item, { inventoryStatus: "記入済" }));
         card.classList.add("hidden");
         showInventoryMessage("info", "商品詳細を表示しました。必要なら「記入済解除」を押してください。");

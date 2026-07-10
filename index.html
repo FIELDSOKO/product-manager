@@ -839,6 +839,18 @@
           <button class="secondary" onclick="mapZoomIn()">＋</button>
           <button class="primary" onclick="mapFitWhole()">全体表示</button>
         </div>
+
+        <div class="mapStatusGuide" aria-label="マップ状態色ガイド">
+          <span class="mapStatusGuideItem">
+            <span class="mapStatusGuideSwatch mapStatusGuideSwatchComplete" aria-hidden="true"></span>
+            緑：在庫確認完了
+          </span>
+          <span class="mapStatusGuideItem">
+            <span class="mapStatusGuideSwatch mapStatusGuideSwatchProgress" aria-hidden="true"></span>
+            黄色：途中
+          </span>
+        </div>
+
         <div id="mapMessage" class="msg"></div>
       </div>
 
