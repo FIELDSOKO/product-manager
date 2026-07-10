@@ -540,27 +540,7 @@
           return res.json();
         })
         .then(function(data) {
-          var latestVersion = safeVersion(data && data.version);
-          var loadedIndexVersion = "";
-
-          try {
-            loadedIndexVersion = new URL(window.location.href).searchParams.get("appVersion") || "";
-          } catch (e) {}
-
-          // Safari通常起動・ホーム画面起動のどちらでも、
-          // 古いindex.htmlのまま最新JSだけを読み込む状態を作らない。
-          // index.html自身を最新版URLで再取得してから、同じアセット読込処理へ進む。
-          if (loadedIndexVersion !== latestVersion) {
-            try {
-              var latestUrl = new URL(window.location.href);
-              latestUrl.searchParams.set("appVersion", latestVersion);
-              latestUrl.searchParams.set("cacheBust", Date.now());
-              window.location.replace(latestUrl.toString());
-              return;
-            } catch (e) {}
-          }
-
-          loadAppAssets(latestVersion);
+          loadAppAssets(data && data.version);
         })
         .catch(function() {
           loadAppAssets(fallbackVersion);
