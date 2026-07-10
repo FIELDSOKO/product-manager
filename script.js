@@ -175,11 +175,13 @@ function openCommonActionConfirm_(message, callback) {
   commonActionConfirmCallback_ = callback;
   messageEl.textContent = message || "";
   modal.classList.add("show");
+  if (document.body) document.body.classList.add("common-action-confirm-open");
 }
 
 function closeCommonActionConfirm_() {
   const modal = document.getElementById("commonActionConfirmModal");
   if (modal) modal.classList.remove("show");
+  if (document.body) document.body.classList.remove("common-action-confirm-open");
   commonActionConfirmCallback_ = null;
 }
 
@@ -189,6 +191,7 @@ function executeCommonActionConfirm_() {
 
   commonActionConfirmCallback_ = null;
   if (modal) modal.classList.remove("show");
+  if (document.body) document.body.classList.remove("common-action-confirm-open");
 
   if (typeof callback === "function") {
     callback();

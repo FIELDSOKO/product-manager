@@ -330,6 +330,23 @@ button {
 
 .modalBack.show { display: flex; }
 
+#commonActionConfirmModal {
+  z-index: 2147483647 !important;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+#commonActionConfirmModal .modal {
+  position: relative;
+  z-index: 1;
+  pointer-events: auto;
+}
+
+body.common-action-confirm-open {
+  overflow: hidden !important;
+  touch-action: none;
+}
+
 .modal {
   width: 100%;
   max-width: 460px;
