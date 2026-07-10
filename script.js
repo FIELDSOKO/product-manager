@@ -67,10 +67,13 @@ let inventoryMapStateRefreshFloor_ = "";
 let inventoryMapLayoutRenderSeq_ = 0;
 let inventoryMapPendingLayoutFrame_ = 0;
 let inventoryMapFitMode_ = false;
+let inventoryMapBackgroundPrepareScheduled_ = false;
+let inventoryMapBackgroundPrepareWaiting_ = false;
+const inventoryMapBackgroundPreparePromises_ = {};
+let commonActionConfirmCallback_ = null;
 
 function initApp_() {
   setAppVersion();
-  checkAppVersionUpdate_();
   if (window.__APP_LOADING && window.__APP_LOADING.startMasterTimeout) {
     window.__APP_LOADING.startMasterTimeout();
   }
@@ -86,10 +89,39 @@ if (document.readyState === "complete") {
 
 function showMainSection(section) {
   const nextSection = section || "menu";
+  const previousSection = activeSection;
   const wasMap = activeSection === "map";
 
   if (wasMap && nextSection !== "map") {
     stopInventoryMapAutoRefresh_();
+  }
+
+  if (nextSection === "menu") {
+    if (previousSection === "search") {
+      clearAll();
+    } else if (previousSection === "inventory") {
+      [
+        "invTextInput",
+        "invJanInput",
+        "invHinbanInput",
+        "invNameInput",
+        "invColorInput",
+        "invSizeInput",
+        "invLocationInput"
+      ].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (el) el.value = "";
+      });
+      inventoryClearDisplayOnly_();
+    }
+
+    closeCommonActionConfirm_();
+
+    const confirmModal = document.getElementById("confirmModal");
+    if (confirmModal) confirmModal.classList.remove("show");
+
+    const completeModal = document.getElementById("completeModal");
+    if (completeModal) completeModal.classList.remove("show");
   }
 
   activeSection = nextSection;
@@ -117,6 +149,10 @@ function showMainSection(section) {
     stopInventoryMapAutoRefresh_();
     loadInventoryMap(currentMapFloor || "1F");
   }
+
+  if (activeSection === "menu") {
+    resumeInventoryMapBackgroundPrepare_();
+  }
 }
 
 function openInventoryMenu() {
@@ -130,6 +166,35 @@ function openMapMenu() {
   beginSearchLoading_();
   showMainSection("map");
 }
+
+function openCommonActionConfirm_(message, callback) {
+  const modal = document.getElementById("commonActionConfirmModal");
+  const messageEl = document.getElementById("commonActionConfirmMessage");
+  if (!modal || !messageEl || typeof callback !== "function") return;
+
+  commonActionConfirmCallback_ = callback;
+  messageEl.textContent = message || "";
+  modal.classList.add("show");
+}
+
+function closeCommonActionConfirm_() {
+  const modal = document.getElementById("commonActionConfirmModal");
+  if (modal) modal.classList.remove("show");
+  commonActionConfirmCallback_ = null;
+}
+
+function executeCommonActionConfirm_() {
+  const callback = commonActionConfirmCallback_;
+  const modal = document.getElementById("commonActionConfirmModal");
+
+  commonActionConfirmCallback_ = null;
+  if (modal) modal.classList.remove("show");
+
+  if (typeof callback === "function") {
+    callback();
+  }
+}
+
 
 function showInventoryMessage(type, text) {
   const el = document.getElementById("inventoryMessage");
@@ -162,42 +227,6 @@ function hideMapMessage() {
 function setAppVersion() {
   const el = document.getElementById("appVersion");
   if (el) el.textContent = "Ver." + APP_VERSION;
-}
-
-function checkAppVersionUpdate_() {
-  fetch("version.json?ts=" + Date.now(), { cache: "no-store" })
-    .then(function(res) {
-      if (!res.ok) return null;
-      return res.json();
-    })
-    .then(function(data) {
-      const latestVersion = data && data.version ? String(data.version) : "";
-      if (latestVersion && latestVersion !== String(APP_VERSION)) {
-        forceReloadWithLatestVersion_(latestVersion);
-      }
-    })
-    .catch(function() {});
-}
-
-function forceReloadWithLatestVersion_(latestVersion) {
-  try {
-    var safeLatestVersion = String(latestVersion || "").replace(/[^0-9A-Za-z._-]/g, "");
-    if (!safeLatestVersion) {
-      window.location.reload();
-      return;
-    }
-
-    try {
-      localStorage.setItem("stockAppLatestVersion", safeLatestVersion);
-    } catch (e) {}
-
-    var url = new URL(window.location.href);
-    url.searchParams.set("appVersion", safeLatestVersion);
-    url.searchParams.set("cacheBust", Date.now());
-    window.location.replace(url.toString());
-  } catch (e) {
-    window.location.reload();
-  }
 }
 
 function callGas(action, params) {
@@ -271,6 +300,7 @@ function notifyBootMasterUpdatedAtDone_() {
   if (window.__APP_LOADING && window.__APP_LOADING.finishMaster) {
     window.__APP_LOADING.finishMaster();
   }
+  scheduleInventoryMapBackgroundPrepare_();
 }
 
 
@@ -1140,6 +1170,7 @@ async function stopScanner() {
   lastScanPointInfo = null;
 
   updateZoomButtons_();
+  resumeInventoryMapBackgroundPrepare_();
 }
 
 
@@ -1550,11 +1581,15 @@ function inventorySelectItem(item) {
 }
 
 function inventoryMarkCurrent() {
-  inventorySetCurrentStatus_("記入済");
+  openCommonActionConfirm_("この商品を記入済にしますか？", function() {
+    inventorySetCurrentStatus_("記入済");
+  });
 }
 
 function inventoryUnmarkCurrent() {
-  inventorySetCurrentStatus_("");
+  openCommonActionConfirm_("この商品の記入済を解除しますか？", function() {
+    inventorySetCurrentStatus_("");
+  });
 }
 
 function inventorySetCurrentStatus_(status) {
@@ -2014,8 +2049,21 @@ function closeMapActionSheet() {
   if (back) back.classList.remove("show");
 }
 
-function mapSetSelectedLocationState(state) {
+function mapSetSelectedLocationState(state, confirmed) {
   if (!selectedMapLocation || !isInventoryLocationText_(selectedMapLocation)) return;
+
+  if (!confirmed) {
+    const message = state === "完了"
+      ? "このロケを『完了』に変更しますか？"
+      : state === "途中"
+        ? "このロケを『途中』に変更しますか？"
+        : "このロケの状態をクリアしますか？";
+
+    openCommonActionConfirm_(message, function() {
+      mapSetSelectedLocationState(state, true);
+    });
+    return;
+  }
 
   beginSearchLoading_();
   callGas("inventorySetLocationState", {
@@ -2239,6 +2287,16 @@ document.addEventListener("DOMContentLoaded", function() {
   showMainSection("menu");
 });
 
+window.addEventListener("pageshow", function() {
+  resumeInventoryMapBackgroundPrepare_();
+});
+
+document.addEventListener("visibilitychange", function() {
+  if (document.visibilityState === "visible") {
+    resumeInventoryMapBackgroundPrepare_();
+  }
+});
+
 window.addEventListener("resize", function() {
   if (activeSection === "map" && currentMapData) {
     // モバイルブラウザのアドレスバー表示変化などで、表示後数秒以内にresizeが発火することがある。
@@ -2307,6 +2365,159 @@ function writeInventoryMapLayoutToBrowserCache_(floor, version, data) {
 
 
 
+function canStartInventoryMapBackgroundPrepare_() {
+  return (
+    activeSection === "menu" &&
+    !scannerRunning &&
+    document.visibilityState !== "hidden"
+  );
+}
+
+function resumeInventoryMapBackgroundPrepare_() {
+  if (!inventoryMapBackgroundPrepareWaiting_) return;
+  if (!canStartInventoryMapBackgroundPrepare_()) return;
+  scheduleInventoryMapBackgroundPrepare_();
+}
+
+function scheduleInventoryMapBackgroundPrepare_() {
+  if (inventoryMapBackgroundPrepareScheduled_) return;
+  inventoryMapBackgroundPrepareScheduled_ = true;
+  inventoryMapBackgroundPrepareWaiting_ = false;
+
+  let priorityFloor = currentMapFloor || "1F";
+  try {
+    const savedFloor = String(localStorage.getItem("inventoryMapLastFloor") || "").toUpperCase();
+    if (savedFloor === "1F" || savedFloor === "2F") priorityFloor = savedFloor;
+  } catch (e) {}
+
+  if (priorityFloor !== "1F" && priorityFloor !== "2F") priorityFloor = "1F";
+  const secondaryFloor = priorityFloor === "1F" ? "2F" : "1F";
+
+  const finishPrepare = function(waitForResume) {
+    inventoryMapBackgroundPrepareScheduled_ = false;
+    inventoryMapBackgroundPrepareWaiting_ = !!waitForResume;
+  };
+
+  const runSecondary = function() {
+    if (!canStartInventoryMapBackgroundPrepare_()) {
+      finishPrepare(true);
+      return;
+    }
+
+    // もう一方の階は既存キャッシュがある場合だけ確認する。
+    // キャッシュが無い階を起動直後に追加フル取得しない。
+    prepareInventoryMapCacheInBackground_(secondaryFloor, false)
+      .catch(function() {})
+      .finally(function() {
+        finishPrepare(false);
+      });
+  };
+
+  const runPrimary = function() {
+    if (!canStartInventoryMapBackgroundPrepare_()) {
+      finishPrepare(true);
+      return;
+    }
+
+    prepareInventoryMapCacheInBackground_(priorityFloor, true)
+      .catch(function() {})
+      .finally(function() {
+        if (typeof window.requestIdleCallback === "function") {
+          window.requestIdleCallback(runSecondary, { timeout: 12000 });
+        } else {
+          setTimeout(runSecondary, 6000);
+        }
+      });
+  };
+
+  if (typeof window.requestIdleCallback === "function") {
+    window.requestIdleCallback(runPrimary, { timeout: 6000 });
+  } else {
+    setTimeout(runPrimary, 2000);
+  }
+}
+
+function prepareInventoryMapCacheInBackground_(floor, allowFullFetch) {
+  const requestFloor = String(floor || "1F").toUpperCase();
+  if (inventoryMapBackgroundPreparePromises_[requestFloor]) {
+    return inventoryMapBackgroundPreparePromises_[requestFloor];
+  }
+
+  const promise = Promise.resolve()
+    .then(function() {
+      const cachedLayout = readLatestInventoryMapLayoutFromBrowserCache_(requestFloor);
+
+      // 優先階以外は、キャッシュが無い場合にフル取得しない。
+      if (!cachedLayout && allowFullFetch === false) {
+        return null;
+      }
+
+      const cachedVersion = cachedLayout ? String(cachedLayout.layoutVersion || "") : "";
+      const cachedSchema = cachedLayout
+        ? Number(cachedLayout.__cacheSchema || cachedLayout.cacheSchema || 0)
+        : 0;
+
+      return callGas("inventoryGetMapMeta", { floor: requestFloor })
+        .then(function(meta) {
+          const metaVersion = meta && meta.ok && meta.layoutVersion
+            ? String(meta.layoutVersion)
+            : "";
+
+          // 既存キャッシュが現行schemaかつ最新版なら、フル取得しない。
+          if (
+            cachedLayout &&
+            cachedSchema >= INVENTORY_MAP_CACHE_SCHEMA_VERSION &&
+            cachedVersion &&
+            metaVersion &&
+            cachedVersion === metaVersion
+          ) {
+            return null;
+          }
+
+          // メタが取得できない場合は既存キャッシュを維持し、
+          // 不明な状態を理由にフル取得しない。
+          if (cachedLayout && !metaVersion) {
+            return null;
+          }
+
+          if (metaVersion) {
+            const exactCached = readInventoryMapLayoutFromBrowserCache_(requestFloor, metaVersion);
+            if (exactCached) return null;
+          }
+
+          if (allowFullFetch === false && !cachedLayout) {
+            return null;
+          }
+
+          return callGas("inventoryGetMap", {
+            floor: requestFloor,
+            compact: "1",
+            __timeoutMs: 60000
+          }).then(function(fullRes) {
+            const normalized = normalizeInventoryMapResponse_(fullRes);
+            if (!normalized || !normalized.ok || !normalized.layoutVersion) return null;
+
+            normalized.floor = requestFloor;
+            const layoutOnly = Object.assign({}, normalized);
+            delete layoutOnly.locationStates;
+            writeInventoryMapLayoutToBrowserCache_(
+              requestFloor,
+              normalized.layoutVersion,
+              layoutOnly
+            );
+            return normalized;
+          });
+        });
+    })
+    .finally(function() {
+      delete inventoryMapBackgroundPreparePromises_[requestFloor];
+    });
+
+  inventoryMapBackgroundPreparePromises_[requestFloor] = promise;
+  return promise;
+}
+
+
 function expandInventoryMapBorders_(borders) {
   if (!borders) return null;
 
@@ -2340,11 +2551,27 @@ function loadInventoryMap(floor) {
   }
 
   const requestFloor = currentMapFloor;
+  try {
+    localStorage.setItem("inventoryMapLastFloor", requestFloor);
+  } catch (e) {}
   const layoutReasonForFirstRender = previousFloor && previousFloor !== requestFloor ? "floorChanged" : "initial";
   stopInventoryMapAutoRefresh_();
   hideMapMessage();
 
   const cachedLayout = readLatestInventoryMapLayoutFromBrowserCache_(requestFloor);
+
+  if (!cachedLayout && inventoryMapBackgroundPreparePromises_[requestFloor]) {
+    beginSearchLoading_();
+    inventoryMapBackgroundPreparePromises_[requestFloor]
+      .catch(function() {})
+      .finally(function() {
+        if (activeSection === "map" && currentMapFloor === requestFloor) {
+          loadInventoryMap(requestFloor);
+        }
+      });
+    return;
+  }
+
   let showedCached = false;
   let cachedLayoutVersion = "";
   let cachedLayoutSchema = 0;

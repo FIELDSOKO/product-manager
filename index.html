@@ -540,7 +540,8 @@
           return res.json();
         })
         .then(function(data) {
-          loadAppAssets(data && data.version);
+          var latestVersion = safeVersion(data && data.version);
+          loadAppAssets(latestVersion);
         })
         .catch(function() {
           loadAppAssets(fallbackVersion);
@@ -905,6 +906,17 @@
       <div class="modalBtns">
         <button class="success" onclick="confirmUpdate()">はい</button>
         <button class="secondary" onclick="closeConfirm()">いいえ</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modalBack" id="commonActionConfirmModal">
+    <div class="modal">
+      <h2 id="commonActionConfirmMessage"></h2>
+
+      <div class="modalBtns">
+        <button class="success" onclick="executeCommonActionConfirm_()">はい</button>
+        <button class="secondary" onclick="closeCommonActionConfirm_()">いいえ</button>
       </div>
     </div>
   </div>
