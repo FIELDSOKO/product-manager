@@ -164,12 +164,7 @@ function setAppVersion() {
   if (el) el.textContent = "Ver." + APP_VERSION;
 }
 
-let appVersionUpdateCheckBusy_ = false;
-
 function checkAppVersionUpdate_() {
-  if (appVersionUpdateCheckBusy_) return;
-  appVersionUpdateCheckBusy_ = true;
-
   fetch("version.json?ts=" + Date.now(), { cache: "no-store" })
     .then(function(res) {
       if (!res.ok) return null;
@@ -177,24 +172,11 @@ function checkAppVersionUpdate_() {
     })
     .then(function(data) {
       const latestVersion = data && data.version ? String(data.version) : "";
-      if (!latestVersion) return;
-
-      let loadedIndexVersion = "";
-      try {
-        loadedIndexVersion = new URL(window.location.href).searchParams.get("appVersion") || "";
-      } catch (e) {}
-
-      if (
-        latestVersion !== String(APP_VERSION) ||
-        loadedIndexVersion !== latestVersion
-      ) {
+      if (latestVersion && latestVersion !== String(APP_VERSION)) {
         forceReloadWithLatestVersion_(latestVersion);
       }
     })
-    .catch(function() {})
-    .finally(function() {
-      appVersionUpdateCheckBusy_ = false;
-    });
+    .catch(function() {});
 }
 
 function forceReloadWithLatestVersion_(latestVersion) {
@@ -2255,16 +2237,6 @@ function getInventoryMapPointInViewport_(outer, clientX, clientY) {
 
 document.addEventListener("DOMContentLoaded", function() {
   showMainSection("menu");
-});
-
-window.addEventListener("pageshow", function() {
-  checkAppVersionUpdate_();
-});
-
-document.addEventListener("visibilitychange", function() {
-  if (document.visibilityState === "visible") {
-    checkAppVersionUpdate_();
-  }
 });
 
 window.addEventListener("resize", function() {
