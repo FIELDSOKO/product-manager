@@ -540,7 +540,22 @@
           return res.json();
         })
         .then(function(data) {
-          loadAppAssets(data && data.version);
+          var latestVersion = safeVersion(data && data.version);
+
+          // URLにappVersionが無いこと自体は更新理由にしない。
+          // このindex.htmlに埋め込まれたバージョンとversion.jsonが異なる時だけ、
+          // Safari通常起動・ホーム画面起動のどちらも同じ方法で一度だけ最新版へ切り替える。
+          if (latestVersion !== fallbackVersion) {
+            try {
+              var latestUrl = new URL(window.location.href);
+              latestUrl.searchParams.set("appVersion", latestVersion);
+              latestUrl.searchParams.set("cacheBust", Date.now());
+              window.location.replace(latestUrl.toString());
+              return;
+            } catch (e) {}
+          }
+
+          loadAppAssets(latestVersion);
         })
         .catch(function() {
           loadAppAssets(fallbackVersion);

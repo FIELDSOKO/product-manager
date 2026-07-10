@@ -67,6 +67,8 @@ let inventoryMapStateRefreshFloor_ = "";
 let inventoryMapLayoutRenderSeq_ = 0;
 let inventoryMapPendingLayoutFrame_ = 0;
 let inventoryMapFitMode_ = false;
+let inventoryMapBackgroundPrepareScheduled_ = false;
+const inventoryMapBackgroundPreparePromises_ = {};
 
 function initApp_() {
   setAppVersion();
@@ -164,7 +166,12 @@ function setAppVersion() {
   if (el) el.textContent = "Ver." + APP_VERSION;
 }
 
+let appVersionUpdateCheckBusy_ = false;
+
 function checkAppVersionUpdate_() {
+  if (appVersionUpdateCheckBusy_) return;
+  appVersionUpdateCheckBusy_ = true;
+
   fetch("version.json?ts=" + Date.now(), { cache: "no-store" })
     .then(function(res) {
       if (!res.ok) return null;
@@ -172,11 +179,16 @@ function checkAppVersionUpdate_() {
     })
     .then(function(data) {
       const latestVersion = data && data.version ? String(data.version) : "";
-      if (latestVersion && latestVersion !== String(APP_VERSION)) {
+      if (!latestVersion) return;
+
+      if (latestVersion !== String(APP_VERSION)) {
         forceReloadWithLatestVersion_(latestVersion);
       }
     })
-    .catch(function() {});
+    .catch(function() {})
+    .finally(function() {
+      appVersionUpdateCheckBusy_ = false;
+    });
 }
 
 function forceReloadWithLatestVersion_(latestVersion) {
@@ -271,6 +283,7 @@ function notifyBootMasterUpdatedAtDone_() {
   if (window.__APP_LOADING && window.__APP_LOADING.finishMaster) {
     window.__APP_LOADING.finishMaster();
   }
+  scheduleInventoryMapBackgroundPrepare_();
 }
 
 
@@ -2239,6 +2252,16 @@ document.addEventListener("DOMContentLoaded", function() {
   showMainSection("menu");
 });
 
+window.addEventListener("pageshow", function() {
+  checkAppVersionUpdate_();
+});
+
+document.addEventListener("visibilitychange", function() {
+  if (document.visibilityState === "visible") {
+    checkAppVersionUpdate_();
+  }
+});
+
 window.addEventListener("resize", function() {
   if (activeSection === "map" && currentMapData) {
     // モバイルブラウザのアドレスバー表示変化などで、表示後数秒以内にresizeが発火することがある。
@@ -2307,6 +2330,97 @@ function writeInventoryMapLayoutToBrowserCache_(floor, version, data) {
 
 
 
+function scheduleInventoryMapBackgroundPrepare_() {
+  if (inventoryMapBackgroundPrepareScheduled_) return;
+  inventoryMapBackgroundPrepareScheduled_ = true;
+
+  const run = function() {
+    prepareInventoryMapCacheInBackground_("1F")
+      .catch(function() {})
+      .then(function() {
+        return prepareInventoryMapCacheInBackground_("2F");
+      })
+      .catch(function() {});
+  };
+
+  if (typeof window.requestIdleCallback === "function") {
+    window.requestIdleCallback(run, { timeout: 2500 });
+  } else {
+    setTimeout(run, 350);
+  }
+}
+
+function prepareInventoryMapCacheInBackground_(floor) {
+  const requestFloor = String(floor || "1F").toUpperCase();
+  if (inventoryMapBackgroundPreparePromises_[requestFloor]) {
+    return inventoryMapBackgroundPreparePromises_[requestFloor];
+  }
+
+  const promise = Promise.resolve()
+    .then(function() {
+      const cachedLayout = readLatestInventoryMapLayoutFromBrowserCache_(requestFloor);
+      const cachedVersion = cachedLayout ? String(cachedLayout.layoutVersion || "") : "";
+      const cachedSchema = cachedLayout
+        ? Number(cachedLayout.__cacheSchema || cachedLayout.cacheSchema || 0)
+        : 0;
+
+      return callGas("inventoryGetMapMeta", { floor: requestFloor })
+        .then(function(meta) {
+          const metaVersion = meta && meta.ok && meta.layoutVersion
+            ? String(meta.layoutVersion)
+            : "";
+
+          // 既存キャッシュが現行schemaかつ最新版なら、フル取得しない。
+          if (
+            cachedLayout &&
+            cachedSchema >= INVENTORY_MAP_CACHE_SCHEMA_VERSION &&
+            cachedVersion &&
+            metaVersion &&
+            cachedVersion === metaVersion
+          ) {
+            return null;
+          }
+
+          // メタが取得できない場合は既存キャッシュを維持し、
+          // 不明な状態を理由にフル取得しない。
+          if (cachedLayout && !metaVersion) {
+            return null;
+          }
+
+          if (metaVersion) {
+            const exactCached = readInventoryMapLayoutFromBrowserCache_(requestFloor, metaVersion);
+            if (exactCached) return null;
+          }
+
+          return callGas("inventoryGetMap", {
+            floor: requestFloor,
+            compact: "1",
+            __timeoutMs: 60000
+          }).then(function(fullRes) {
+            const normalized = normalizeInventoryMapResponse_(fullRes);
+            if (!normalized || !normalized.ok || !normalized.layoutVersion) return null;
+
+            normalized.floor = requestFloor;
+            const layoutOnly = Object.assign({}, normalized);
+            delete layoutOnly.locationStates;
+            writeInventoryMapLayoutToBrowserCache_(
+              requestFloor,
+              normalized.layoutVersion,
+              layoutOnly
+            );
+            return normalized;
+          });
+        });
+    })
+    .finally(function() {
+      delete inventoryMapBackgroundPreparePromises_[requestFloor];
+    });
+
+  inventoryMapBackgroundPreparePromises_[requestFloor] = promise;
+  return promise;
+}
+
+
 function expandInventoryMapBorders_(borders) {
   if (!borders) return null;
 
@@ -2345,6 +2459,19 @@ function loadInventoryMap(floor) {
   hideMapMessage();
 
   const cachedLayout = readLatestInventoryMapLayoutFromBrowserCache_(requestFloor);
+
+  if (!cachedLayout && inventoryMapBackgroundPreparePromises_[requestFloor]) {
+    beginSearchLoading_();
+    inventoryMapBackgroundPreparePromises_[requestFloor]
+      .catch(function() {})
+      .finally(function() {
+        if (activeSection === "map" && currentMapFloor === requestFloor) {
+          loadInventoryMap(requestFloor);
+        }
+      });
+    return;
+  }
+
   let showedCached = false;
   let cachedLayoutVersion = "";
   let cachedLayoutSchema = 0;
