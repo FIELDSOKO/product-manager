@@ -540,39 +540,7 @@
           return res.json();
         })
         .then(function(data) {
-          var latestVersion = safeVersion(data && data.version);
-          var urlVersion = "";
-          var savedVersion = "";
-
-          try {
-            urlVersion = new URL(window.location.href).searchParams.get("appVersion") || "";
-          } catch (e) {}
-
-          try {
-            savedVersion = localStorage.getItem("stockAppLatestVersion") || "";
-          } catch (e) {}
-
-          // 更新判定の正はversion.json。
-          // URLに旧appVersionがある場合、または通常URLで端末に保存済みの版が古い場合だけ、
-          // 最新版URLへ最大1回移動する。固定fallbackVersionは更新判定に使わない。
-          if (
-            (urlVersion && urlVersion !== latestVersion) ||
-            (!urlVersion && savedVersion && savedVersion !== latestVersion)
-          ) {
-            try {
-              var latestUrl = new URL(window.location.href);
-              latestUrl.searchParams.set("appVersion", latestVersion);
-              latestUrl.searchParams.set("cacheBust", Date.now());
-              window.location.replace(latestUrl.toString());
-              return;
-            } catch (e) {}
-          }
-
-          try {
-            localStorage.setItem("stockAppLatestVersion", latestVersion);
-          } catch (e) {}
-
-          loadAppAssets(latestVersion);
+          loadAppAssets(data && data.version);
         })
         .catch(function() {
           loadAppAssets(fallbackVersion);
@@ -937,17 +905,6 @@
       <div class="modalBtns">
         <button class="success" onclick="confirmUpdate()">はい</button>
         <button class="secondary" onclick="closeConfirm()">いいえ</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="modalBack" id="commonActionConfirmModal">
-    <div class="modal">
-      <h2 id="commonActionConfirmMessage"></h2>
-
-      <div class="modalBtns">
-        <button class="success" onclick="executeCommonActionConfirm_()">はい</button>
-        <button class="secondary" onclick="closeCommonActionConfirm_()">いいえ</button>
       </div>
     </div>
   </div>
