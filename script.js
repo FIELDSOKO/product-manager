@@ -1546,9 +1546,18 @@ function inventorySearch() {
 
 function updateInventoryBackToMarkedListButton_() {
   const btn = document.getElementById("inventoryBackToMarkedListBtn");
-  if (!btn) return;
-  btn.textContent = currentInventoryBackButtonLabel || "一覧へ戻る";
-  btn.classList.toggle("hidden", !currentInventoryMarkedListActive);
+  if (btn) {
+    btn.textContent = currentInventoryBackButtonLabel || "一覧へ戻る";
+    btn.classList.toggle("hidden", !currentInventoryMarkedListActive);
+  }
+
+  const searchBackBtn = document.getElementById("inventoryBackToSearchListBtn");
+  if (searchBackBtn) {
+    searchBackBtn.classList.toggle(
+      "hidden",
+      currentInventoryMarkedListActive || !inventorySearchListReturnAvailable_
+    );
+  }
 }
 
 function inventoryBackToMarkedList() {
@@ -1562,6 +1571,23 @@ function inventoryBackToMarkedList() {
   selectedInventoryItem = null;
   updateInventoryBackToMarkedListButton_();
   hideInventoryMessage();
+}
+
+function inventoryBackToSearchResults() {
+  if (currentInventoryMarkedListActive || !inventorySearchListReturnAvailable_) return;
+
+  const productCard = document.getElementById("inventoryProductCard");
+  const listCard = document.getElementById("inventoryListCard");
+
+  if (productCard) productCard.classList.add("hidden");
+  if (listCard) listCard.classList.remove("hidden");
+  selectedInventoryItem = null;
+  updateInventoryBackToMarkedListButton_();
+  hideInventoryMessage();
+
+  setTimeout(function() {
+    window.scrollTo(0, inventorySearchListReturnScrollY_ || 0);
+  }, 0);
 }
 
 function inventorySelectItem(item) {
@@ -1629,19 +1655,6 @@ function inventorySetCurrentStatus_(status) {
 
     if (status !== "記入済" && currentInventoryMarkedListActive) {
       inventoryReloadMarkedList_();
-      return;
-    }
-
-    if (!currentInventoryMarkedListActive && inventorySearchListReturnAvailable_) {
-      const productCard = document.getElementById("inventoryProductCard");
-      const listCard = document.getElementById("inventoryListCard");
-      if (productCard) productCard.classList.add("hidden");
-      if (listCard) listCard.classList.remove("hidden");
-      selectedInventoryItem = null;
-      hideInventoryMessage();
-      setTimeout(function() {
-        window.scrollTo(0, inventorySearchListReturnScrollY_ || 0);
-      }, 0);
       return;
     }
 
