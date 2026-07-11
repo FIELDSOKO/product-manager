@@ -42,6 +42,9 @@ let selectedInventoryItem = null;
 let selectedMapLocation = "";
 let currentMapFloor = "1F";
 let currentMapState = {};
+let currentMapMemoLocations = {};
+let mapLocationMemoRequestSeq_ = 0;
+let selectedMapLocationPendingState_ = "";
 let mapScaleValue = 1;
 let mapMinScaleValue = 0.6;
 let mapPinchStartDistance = 0;
@@ -151,7 +154,7 @@ function showMainSection(section) {
 
   if (activeSection === "map") {
     stopInventoryMapAutoRefresh_();
-    loadInventoryMap(currentMapFloor || "1F");
+    loadInventoryMapHandled_(currentMapFloor || "1F");
   }
 
   if (activeSection === "menu") {
@@ -1953,6 +1956,7 @@ function renderInventoryMap(data, layoutRenderReason) {
   const renderedSignature = grid && grid.dataset ? (grid.dataset.layoutSignature || "") : "";
 
   currentMapState = (data && data.locationStates) || currentMapState || {};
+  currentMapMemoLocations = (data && data.memoLocations) || currentMapMemoLocations || {};
   currentMapData = data;
 
   // 状態更新・自動更新・更新日時確認ではDOMを作り直さない。
@@ -1960,6 +1964,7 @@ function renderInventoryMap(data, layoutRenderReason) {
   if (!isInventoryMapLayoutRenderAllowed_(layoutRenderReason, renderedSignature, nextSignature)) {
     currentInventoryMapLayoutSignature_ = nextSignature;
     applyInventoryMapStateOnly_(currentMapState);
+    applyInventoryMapMemoMarkers_();
     updateMapZoomLabel_();
     return;
   }
@@ -1974,6 +1979,7 @@ function renderInventoryMap(data, layoutRenderReason) {
   // renderInventoryMapGrid_ を呼ぶ条件：
   // 初回描画 / 1F・2F切替 / 棚マップ更新日時変更 / キャッシュなし取得 のみ。
   renderInventoryMapGrid_(grid, data, false);
+  applyInventoryMapMemoMarkers_();
   currentInventoryMapLayoutSignature_ = nextSignature;
   if (grid && grid.dataset) grid.dataset.layoutSignature = nextSignature;
 
@@ -2037,6 +2043,223 @@ function updateOpenMapActionSheetState_() {
   st.textContent = "現在：" + (state === "途中" ? "🟨途中" : state === "完了" ? "🟩完了" : "⬜空欄");
 }
 
+function hasInventoryMapMemoForLocation_(location) {
+  const key = normalizeInventoryLocationKey_(location);
+  return !!(currentMapMemoLocations && (currentMapMemoLocations[location] || currentMapMemoLocations[key]));
+}
+
+function applyInventoryMapMemoMarkers_() {
+  const grid = document.getElementById("mapGrid");
+  if (!grid) return;
+  const cells = grid.querySelectorAll(".mapCell[data-map-location-key]");
+  Array.prototype.forEach.call(cells, function(el) {
+    const location = el.dataset.mapLocation || "";
+    el.classList.toggle("mapCellHasMemo", hasInventoryMapMemoForLocation_(location));
+  });
+}
+
+function setMapLocationMemoLoading_(loading, message) {
+  const input = document.getElementById("mapLocationMemoInput");
+  const button = document.getElementById("mapLocationMemoSaveBtn");
+  const messageEl = document.getElementById("mapLocationMemoMessage");
+  if (input) input.disabled = !!loading;
+  if (button) button.disabled = !!loading;
+  if (messageEl) messageEl.textContent = message || "";
+}
+
+function loadSelectedMapLocationMemo_() {
+  const location = selectedMapLocation;
+  const floor = currentMapFloor || "1F";
+  const input = document.getElementById("mapLocationMemoInput");
+  if (!location || !input) return;
+
+  const requestSeq = ++mapLocationMemoRequestSeq_;
+  input.value = "";
+  setMapLocationMemoLoading_(true, "メモを読み込み中…");
+
+  callGas("inventoryGetLocationMemo", { floor: floor, location: location })
+    .then(function(res) {
+      if (requestSeq !== mapLocationMemoRequestSeq_ || selectedMapLocation !== location || currentMapFloor !== floor) return;
+      if (!res || !res.ok) {
+        setMapLocationMemoLoading_(false, res && res.message ? res.message : "メモを取得できませんでした。");
+        return;
+      }
+      input.value = res.memo || "";
+      setMapLocationMemoLoading_(false, "");
+    })
+    .catch(function(err) {
+      if (requestSeq !== mapLocationMemoRequestSeq_ || selectedMapLocation !== location || currentMapFloor !== floor) return;
+      setMapLocationMemoLoading_(false, err && err.message ? err.message : String(err));
+    });
+}
+
+function saveSelectedMapLocationMemo() {
+  saveSelectedMapLocationDetail();
+}
+
+
+
+function getMapStateDisplayText_(state) {
+  return state === "完了" ? "完了" : state === "途中" ? "途中" : "クリア";
+}
+
+function updateMapPendingStateButtons_() {
+  const buttons = [
+    { id: "mapStateChoiceProgress", state: "途中" },
+    { id: "mapStateChoiceComplete", state: "完了" },
+    { id: "mapStateChoiceClear", state: "" }
+  ];
+  buttons.forEach(function(item) {
+    const el = document.getElementById(item.id);
+    if (el) el.classList.toggle("isSelected", selectedMapLocationPendingState_ === item.state);
+  });
+}
+
+function saveSelectedMapLocationDetail() {
+  const location = selectedMapLocation;
+  const floor = currentMapFloor || "1F";
+  const input = document.getElementById("mapLocationMemoInput");
+  if (!location || !isInventoryLocationText_(location) || !input) return;
+
+  const status = selectedMapLocationPendingState_ || "";
+  const memo = input.value || "";
+  const message = "この内容で保存しますか？\n\n状態：" + getMapStateDisplayText_(status) + "\n\nメモ：\n" + (memo || "（空欄）");
+
+  openCommonActionConfirm_(message, function() {
+    setMapLocationMemoLoading_(true, "保存中…");
+    callGas("inventorySaveLocationDetail", {
+      floor: floor,
+      location: location,
+      status: status,
+      memo: memo
+    }).then(function(res) {
+      if (selectedMapLocation !== location || currentMapFloor !== floor) return;
+      if (!res || !res.ok) {
+        setMapLocationMemoLoading_(false, res && res.message ? res.message : "保存できませんでした。");
+        return;
+      }
+
+      currentMapState = currentMapState || {};
+      const key = normalizeInventoryLocationKey_(location);
+      if (status) {
+        currentMapState[location] = status;
+        currentMapState[key] = status;
+      } else {
+        delete currentMapState[location];
+        delete currentMapState[key];
+      }
+
+      currentMapMemoLocations = currentMapMemoLocations || {};
+      if (String(memo).trim()) {
+        currentMapMemoLocations[location] = true;
+        currentMapMemoLocations[key] = true;
+      } else {
+        delete currentMapMemoLocations[location];
+        delete currentMapMemoLocations[key];
+      }
+
+      applyInventoryMapStateOnly_(currentMapState);
+      applyInventoryMapMemoMarkers_();
+      closeMapActionSheet();
+      showMapMessage("success", "状態とメモを保存しました。");
+    }).catch(function(err) {
+      if (selectedMapLocation !== location || currentMapFloor !== floor) return;
+      setMapLocationMemoLoading_(false, err && err.message ? err.message : String(err));
+    });
+  });
+}
+
+function openLocationMemoList() {
+  const back = document.getElementById("locationMemoListSheet");
+  const list = document.getElementById("locationMemoList");
+  const message = document.getElementById("locationMemoListMessage");
+  if (back) back.classList.add("show");
+  if (list) list.innerHTML = "";
+  if (message) message.textContent = "読み込み中…";
+
+  callGas("inventoryListLocationMemos", {})
+    .then(function(res) {
+      if (!res || !res.ok) {
+        if (message) message.textContent = res && res.message ? res.message : "メモ一覧を取得できませんでした。";
+        return;
+      }
+      renderLocationMemoList_(res.items || []);
+    })
+    .catch(function(err) {
+      if (message) message.textContent = err && err.message ? err.message : String(err);
+    });
+}
+
+function closeLocationMemoList() {
+  const back = document.getElementById("locationMemoListSheet");
+  if (back) back.classList.remove("show");
+}
+
+function renderLocationMemoList_(items) {
+  const list = document.getElementById("locationMemoList");
+  const message = document.getElementById("locationMemoListMessage");
+  if (!list) return;
+  list.innerHTML = "";
+  if (!items.length) {
+    if (message) message.textContent = "保存されているメモはありません。";
+    return;
+  }
+  if (message) message.textContent = items.length + "件";
+  items.forEach(function(item) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "locationMemoListItem";
+    const head = document.createElement("div");
+    head.className = "locationMemoListHead";
+    head.textContent = (item.floor || "1F") + "　" + (item.location || "");
+    const body = document.createElement("div");
+    body.className = "locationMemoListBody";
+    body.textContent = item.memo || "";
+    button.appendChild(head);
+    button.appendChild(body);
+    button.onclick = function() {
+      closeLocationMemoList();
+      const targetFloor = item.floor === "2F" ? "2F" : "1F";
+      const openEditor = function() { openMapActionSheet(item.location || ""); };
+      if (currentMapFloor !== targetFloor) {
+        loadInventoryMap(targetFloor)
+          .then(function() {
+            if (currentMapFloor === targetFloor) openEditor();
+          })
+          .catch(function(err) {
+            showMapMessage("error", err && err.message ? err.message : String(err));
+          });
+      } else {
+        openEditor();
+      }
+    };
+    list.appendChild(button);
+  });
+}
+
+function confirmClearAllLocationMemos() {
+  openCommonActionConfirm_("全メモを一括削除しますか？\n状態・商品データは削除されません。", function() {
+    const pin = prompt("PINコードを入力してください。");
+    if (pin === null) return;
+    callGas("inventoryClearAllLocationMemos", { pin: pin })
+      .then(function(res) {
+        if (!res || !res.ok) {
+          const message = document.getElementById("locationMemoListMessage");
+          if (message) message.textContent = res && res.message ? res.message : "削除できませんでした。";
+          return;
+        }
+        currentMapMemoLocations = {};
+        applyInventoryMapMemoMarkers_();
+        renderLocationMemoList_([]);
+        const message = document.getElementById("locationMemoListMessage");
+        if (message) message.textContent = "全メモを削除しました。";
+      })
+      .catch(function(err) {
+        const message = document.getElementById("locationMemoListMessage");
+        if (message) message.textContent = err && err.message ? err.message : String(err);
+      });
+  });
+}
 
 function startInventoryMapAutoRefresh_() {
   if (activeSection !== "map") return;
@@ -2097,64 +2320,32 @@ function refreshInventoryMapStateOnly_() {
 function openMapActionSheet(location) {
   if (!isInventoryLocationText_(location)) return;
   selectedMapLocation = location || "";
-  const state = getInventoryMapStateForLocation_(currentMapState, selectedMapLocation);
+  selectedMapLocationPendingState_ = getInventoryMapStateForLocation_(currentMapState, selectedMapLocation) || "";
+  const state = selectedMapLocationPendingState_;
   const back = document.getElementById("mapActionSheet");
   const loc = document.getElementById("mapSheetLocation");
   const st = document.getElementById("mapSheetState");
-  if (loc) loc.textContent = "📍 ロケ：" + selectedMapLocation;
+  if (loc) loc.textContent = "📍 ロケ：" + selectedMapLocation + "（" + (currentMapFloor || "1F") + "）";
   if (st) st.textContent = "現在：" + (state === "途中" ? "🟨途中" : state === "完了" ? "🟩完了" : "⬜空欄");
+  updateMapPendingStateButtons_();
   if (back) back.classList.add("show");
+  loadSelectedMapLocationMemo_();
 }
 
 function closeMapActionSheet() {
+  mapLocationMemoRequestSeq_++;
   const back = document.getElementById("mapActionSheet");
   if (back) back.classList.remove("show");
+  const messageEl = document.getElementById("mapLocationMemoMessage");
+  if (messageEl) messageEl.textContent = "";
 }
 
-function mapSetSelectedLocationState(state, confirmed) {
+function mapSetSelectedLocationState(state) {
   if (!selectedMapLocation || !isInventoryLocationText_(selectedMapLocation)) return;
-
-  if (!confirmed) {
-    const message = state === "完了"
-      ? "このロケを『完了』に変更しますか？"
-      : state === "途中"
-        ? "このロケを『途中』に変更しますか？"
-        : "このロケの状態をクリアしますか？";
-
-    openCommonActionConfirm_(message, function() {
-      mapSetSelectedLocationState(state, true);
-    });
-    return;
-  }
-
-  beginSearchLoading_();
-  callGas("inventorySetLocationState", {
-    location: selectedMapLocation,
-    status: state || ""
-  }).then(function(res) {
-    endSearchLoading_();
-    if (!res || !res.ok) {
-      showMapMessage("error", res && res.message ? res.message : "ロケ状態の保存に失敗しました。");
-      return;
-    }
-    closeMapActionSheet();
-
-    currentMapState = currentMapState || {};
-    const key = normalizeInventoryLocationKey_(selectedMapLocation);
-    if (state) {
-      currentMapState[selectedMapLocation] = state;
-      currentMapState[key] = state;
-    } else {
-      delete currentMapState[selectedMapLocation];
-      delete currentMapState[key];
-    }
-
-    // 状態更新ではマップ全体を再描画しない。表示中セルが無い場合も現在表示を維持する。
-    applyInventoryMapStateOnly_(currentMapState);
-  }).catch(function(err) {
-    endSearchLoading_();
-    showMapMessage("error", err && err.message ? err.message : String(err));
-  });
+  selectedMapLocationPendingState_ = state || "";
+  updateMapPendingStateButtons_();
+  const messageEl = document.getElementById("mapLocationMemoMessage");
+  if (messageEl) messageEl.textContent = "状態を選択しました。保存ボタンを押すまで保存されません。";
 }
 
 function mapClearAllLocationStates() {
@@ -2571,6 +2762,15 @@ function expandInventoryMapBorders_(borders) {
   return out;
 }
 
+function loadInventoryMapHandled_(floor) {
+  return loadInventoryMap(floor).catch(function(err) {
+    if (activeSection === "map") {
+      showMapMessage("error", err && err.message ? err.message : String(err));
+    }
+    return null;
+  });
+}
+
 function loadInventoryMap(floor) {
   var requestedFloor = String(floor || "").toUpperCase();
   const previousFloor = currentMapFloor || "1F";
@@ -2592,14 +2792,14 @@ function loadInventoryMap(floor) {
 
   if (!cachedLayout && inventoryMapBackgroundPreparePromises_[requestFloor]) {
     beginSearchLoading_();
-    inventoryMapBackgroundPreparePromises_[requestFloor]
+    return inventoryMapBackgroundPreparePromises_[requestFloor]
       .catch(function() {})
-      .finally(function() {
+      .then(function() {
         if (activeSection === "map" && currentMapFloor === requestFloor) {
-          loadInventoryMap(requestFloor);
+          return loadInventoryMap(requestFloor);
         }
+        throw new Error("マップ画面が閉じられました。");
       });
-    return;
   }
 
   let showedCached = false;
@@ -2635,11 +2835,16 @@ function loadInventoryMap(floor) {
     beginSearchLoading_();
   }
 
-  callGas("inventoryGetMapMeta", { floor: requestFloor })
+  return callGas("inventoryGetMapMeta", { floor: requestFloor })
     .then(function(meta) {
       if (currentMapFloor !== requestFloor) return null;
 
       const metaLayoutVersion = meta && meta.ok && meta.layoutVersion ? String(meta.layoutVersion) : "";
+      if (meta && meta.ok) {
+        currentMapMemoLocations = meta.memoLocations || {};
+        if (currentMapData) currentMapData.memoLocations = currentMapMemoLocations;
+        applyInventoryMapMemoMarkers_();
+      }
 
       // キャッシュ表示済みで、棚マップ更新日時が変わっていない場合はフルマップを取得しない。
       // これにより、表示後約10秒前後の裏通信完了で renderInventoryMapGrid_ が再実行される経路を遮断する。
@@ -2708,13 +2913,20 @@ function loadInventoryMap(floor) {
       renderInventoryMap(normalized, normalized.__layoutRenderReason || (showedCached ? "layoutVersionChanged" : "cacheMissing"));
       showMapMessage("info", requestFloor === "2F" ? "2階を表示中です。" : "1階を表示中です。");
       startInventoryMapAutoRefresh_();
+      return normalized;
     })
     .catch(function(err) {
-      if (currentMapFloor !== requestFloor) return;
+      if (currentMapFloor !== requestFloor) throw err;
       if (!showedCached) {
         endSearchLoading_();
         showMapMessage("error", err && err.message ? err.message : String(err));
+        throw err;
       }
+      return currentMapData;
+    })
+    .then(function(result) {
+      if (currentMapFloor !== requestFloor) throw new Error("表示する階が変更されました。");
+      return result || currentMapData || { ok: true, floor: requestFloor };
     });
 }
 
@@ -3152,7 +3364,8 @@ function normalizeInventoryMapResponse_(res) {
     rowHeights: compactRowHeights,
     colWidths: compactColWidths,
     cells: cells,
-    locationStates: res.locationStates || {}
+    locationStates: res.locationStates || {},
+    memoLocations: res.memoLocations || {}
   };
 }
 

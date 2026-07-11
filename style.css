@@ -737,3 +737,73 @@ body.map-active .mapOuter {
   border-radius: 12px;
   line-height: 1;
 }
+
+
+/* ロケメモ機能（状態色・マップレイアウトとは独立） */
+.mapMemoField label {
+  margin-bottom: 6px;
+}
+
+.mapMemoField textarea {
+  min-height: 92px;
+}
+
+.mapMemoMessage {
+  min-height: 18px;
+  margin-top: 6px;
+}
+
+.mapCellHasMemo {
+  position: relative;
+}
+
+.mapCellHasMemo::after {
+  content: "📝";
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  font-size: 9px;
+  line-height: 1;
+  pointer-events: none;
+  opacity: 0.82;
+}
+
+
+/* ロケメモ：今回追加部分のみ */
+.mapStateChoice button.isSelected {
+  outline: 4px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.memoListSheet {
+  max-height: min(82dvh, 720px);
+  overflow-y: auto;
+}
+
+.locationMemoList {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.locationMemoListItem {
+  width: 100%;
+  text-align: left;
+  background: #ffffff;
+  color: #111827;
+  border: 1px solid #d1d5db;
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.locationMemoListHead {
+  font-weight: 900;
+  margin-bottom: 5px;
+}
+
+.locationMemoListBody {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-weight: 600;
+  line-height: 1.45;
+}
