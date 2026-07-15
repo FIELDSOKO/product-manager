@@ -807,3 +807,13 @@ body.map-active .mapOuter {
   font-weight: 600;
   line-height: 1.45;
 }
+
+/* ロケ詳細画面：iPhone Safe Area対応 */
+#mapActionSheet {
+  padding-top: env(safe-area-inset-top);
+}
+
+#mapActionSheet .mapSheet {
+  max-height: calc(100dvh - env(safe-area-inset-top));
+  overflow-y: auto;
+}
