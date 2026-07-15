@@ -2160,6 +2160,9 @@ function loadSelectedMapLocationMemo_() {
 
   const requestSeq = ++mapLocationMemoRequestSeq_;
   input.value = "";
+  input.dataset.savedMemo = "";
+  input.dataset.savedMemoFloor = "";
+  input.dataset.savedMemoLocation = "";
   setMapLocationMemoLoading_(true, "メモを読み込み中…");
 
   callGas("inventoryGetLocationMemo", { floor: floor, location: location })
@@ -2170,6 +2173,9 @@ function loadSelectedMapLocationMemo_() {
         return;
       }
       input.value = res.memo || "";
+      input.dataset.savedMemo = input.value;
+      input.dataset.savedMemoFloor = floor;
+      input.dataset.savedMemoLocation = location;
       setMapLocationMemoLoading_(false, "");
     })
     .catch(function(err) {
@@ -2220,6 +2226,11 @@ function saveSelectedMapLocationDetail() {
     }).then(function(res) {
       if (selectedMapLocation !== location || currentMapFloor !== floor) return;
       if (!res || !res.ok) {
+        if (input.dataset.savedMemoFloor === floor && input.dataset.savedMemoLocation === location) {
+          input.value = input.dataset.savedMemo || "";
+        }
+        selectedMapLocationPendingState_ = getInventoryMapStateForLocation_(currentMapState, location) || "";
+        updateMapPendingStateButtons_();
         setMapLocationMemoLoading_(false, res && res.message ? res.message : "保存できませんでした。");
         return;
       }
@@ -2243,12 +2254,20 @@ function saveSelectedMapLocationDetail() {
         delete currentMapMemoLocations[key];
       }
 
+      input.dataset.savedMemo = memo;
+      input.dataset.savedMemoFloor = floor;
+      input.dataset.savedMemoLocation = location;
       applyInventoryMapStateOnly_(currentMapState);
       applyInventoryMapMemoMarkers_();
       closeMapActionSheet();
       showMapMessage("success", "状態とメモを保存しました。");
     }).catch(function(err) {
       if (selectedMapLocation !== location || currentMapFloor !== floor) return;
+      if (input.dataset.savedMemoFloor === floor && input.dataset.savedMemoLocation === location) {
+        input.value = input.dataset.savedMemo || "";
+      }
+      selectedMapLocationPendingState_ = getInventoryMapStateForLocation_(currentMapState, location) || "";
+      updateMapPendingStateButtons_();
       setMapLocationMemoLoading_(false, err && err.message ? err.message : String(err));
     });
   });
@@ -2260,38 +2279,10 @@ function clearSelectedMapLocationMemo() {
   const input = document.getElementById("mapLocationMemoInput");
   if (!location || !isInventoryLocationText_(location) || !input) return;
 
-  openCommonActionConfirm_("このロケのメモを削除しますか？\n\n階：" + floor + "\nロケ：" + location, function() {
-    setMapLocationMemoLoading_(true, "メモを削除中…");
-    callGas("inventoryClearLocationMemo", { floor: floor, location: location })
-      .then(function(res) {
-        if (selectedMapLocation !== location || currentMapFloor !== floor) return;
-        if (!res || !res.ok) {
-          setMapLocationMemoLoading_(false, res && res.message ? res.message : "メモを削除できませんでした。");
-          return;
-        }
-        input.value = "";
-        currentMapMemoLocations = currentMapMemoLocations || {};
-        const key = normalizeInventoryLocationKey_(location);
-        delete currentMapMemoLocations[location];
-        delete currentMapMemoLocations[key];
-        applyInventoryMapMemoMarkers_();
-        const memoList = document.getElementById("locationMemoList");
-        if (memoList) {
-          Array.prototype.forEach.call(memoList.querySelectorAll(".locationMemoListItem"), function(itemEl) {
-            const head = itemEl.querySelector(".locationMemoListHead");
-            if (head && head.textContent === floor + "　" + location) itemEl.remove();
-          });
-          const remaining = memoList.querySelectorAll(".locationMemoListItem").length;
-          const listMessage = document.getElementById("locationMemoListMessage");
-          if (listMessage) listMessage.textContent = remaining ? (remaining + "件") : "保存されているメモはありません。";
-        }
-        setMapLocationMemoLoading_(false, "メモを削除しました。");
-        showMapMessage("success", "メモを削除しました。");
-      })
-      .catch(function(err) {
-        if (selectedMapLocation !== location || currentMapFloor !== floor) return;
-        setMapLocationMemoLoading_(false, err && err.message ? err.message : String(err));
-      });
+  openCommonActionConfirm_("このロケのメモ入力を空にしますか？\n\n階：" + floor + "\nロケ：" + location, function() {
+    input.value = "";
+    const messageEl = document.getElementById("mapLocationMemoMessage");
+    if (messageEl) messageEl.textContent = "メモ入力を空にしました。保存ボタンを押すまで保存されません。";
   });
 }
 
