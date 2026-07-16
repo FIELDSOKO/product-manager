@@ -842,3 +842,29 @@ body.map-active .mapOuter {
   background: #f3f4f6;
   font-weight: 900;
 }
+
+
+/* 履歴検索：保存日幅・ページ横スクロール修正（マップ内部は対象外） */
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+#stockCheckHistorySearchCard,
+#stockCheckHistorySearchCard .grid,
+#stockCheckHistorySearchCard .field {
+  min-width: 0;
+  max-width: 100%;
+}
+
+#stockCheckHistorySearchCard .stockHistoryDateField {
+  grid-column: 1 / -1;
+}
+
+#stockCheckHistorySearchCard input[type="date"] {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}

@@ -2473,21 +2473,43 @@ function renderLocationMemoList_(items) {
     body.textContent = item.memo || "";
     button.appendChild(head);
     button.appendChild(body);
-    button.onclick = function() {
-      closeLocationMemoList();
+    button.onclick = function(event) {
+      if (event) event.stopPropagation();
       const targetFloor = item.floor === "2F" ? "2F" : "1F";
-      const openEditor = function() { openMapActionSheet(item.location || ""); };
-      if (currentMapFloor !== targetFloor) {
-        loadInventoryMap(targetFloor)
-          .then(function() {
-            if (currentMapFloor === targetFloor) openEditor();
-          })
-          .catch(function(err) {
-            showMapMessage("error", err && err.message ? err.message : String(err));
+      const targetLocation = item.location || "";
+      const messageEl = document.getElementById("locationMemoListMessage");
+      if (messageEl) messageEl.textContent = "対象ロケを開いています…";
+      button.disabled = true;
+
+      const mapReadyPromise = currentMapFloor !== targetFloor
+        ? loadInventoryMap(targetFloor)
+        : Promise.resolve(currentMapData);
+
+      mapReadyPromise
+        .then(function() {
+          if (currentMapFloor !== targetFloor) throw new Error("対象階を開けませんでした。");
+          const grid = document.getElementById("mapGrid");
+          const targetKey = normalizeInventoryLocationKey_(targetLocation);
+          const cells = grid ? grid.querySelectorAll(".mapCell[data-map-location-key]") : [];
+          const targetCell = Array.prototype.find.call(cells, function(cell) {
+            return cell.dataset.mapLocationKey === targetKey;
           });
-      } else {
-        openEditor();
-      }
+          if (!targetCell) throw new Error("対象ロケをマップ上で確認できませんでした。");
+
+          openMapActionSheet(targetLocation);
+          const actionSheet = document.getElementById("mapActionSheet");
+          if (!actionSheet || !actionSheet.classList.contains("show") || selectedMapLocation !== targetLocation) {
+            closeMapActionSheet();
+            throw new Error("対象ロケの画面を開けませんでした。");
+          }
+          closeLocationMemoList();
+        })
+        .catch(function(err) {
+          if (messageEl) messageEl.textContent = "エラー：" + (err && err.message ? err.message : String(err));
+        })
+        .finally(function() {
+          button.disabled = false;
+        });
     };
     list.appendChild(button);
   });
