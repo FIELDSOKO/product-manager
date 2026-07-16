@@ -98,6 +98,13 @@ let stockCheckSelectedItem_ = null;
 let stockCheckListScrollY_ = 0;
 let stockCheckReturnSource_ = "stockList";
 const STOCK_CHECK_SEARCH_LIMIT_ = 20;
+let stockCheckHistorySearchPayload_ = null;
+let stockCheckHistoryOffset_ = 0;
+let stockCheckHistoryHasMore_ = false;
+let stockCheckHistoryTotal_ = 0;
+let stockCheckHistoryListScrollY_ = 0;
+let stockCheckHistorySelectedItem_ = null;
+const STOCK_CHECK_HISTORY_LIMIT_ = 20;
 
 
 function initApp_() {
@@ -2685,7 +2692,35 @@ function mapShowSelectedProductsByStatus(filter) {
 function openStockCheckMenu() {
   stockCheckReturnSource_ = "stockList";
   showMainSection("stockCheck");
+  stockCheckShowModeMenu_();
+}
+
+function stockCheckShowModeMenu_() {
+  ["stockCheckMenuCard"].forEach(function(id){ const el=document.getElementById(id); if(el) el.classList.remove("hidden"); });
+  ["stockCheckSearchCard","stockCheckListCard","stockCheckProductCard","stockCheckHistorySearchCard","stockCheckHistoryListCard","stockCheckHistoryDetailCard","stockCheckHistoryEditCard"].forEach(function(id){ const el=document.getElementById(id); if(el) el.classList.add("hidden"); });
+}
+
+function stockCheckBackToModeMenu() {
+  stockCheckShowModeMenu_();
+  setTimeout(function(){ window.scrollTo(0,0); },0);
+}
+
+function openStockCheckInput() {
+  const menu=document.getElementById("stockCheckMenuCard"); if(menu) menu.classList.add("hidden");
   stockCheckShowSearch_();
+}
+
+function openStockCheckHistory() {
+  const menu=document.getElementById("stockCheckMenuCard"); if(menu) menu.classList.add("hidden");
+  ["stockCheckSearchCard","stockCheckListCard","stockCheckProductCard","stockCheckHistoryListCard","stockCheckHistoryDetailCard","stockCheckHistoryEditCard"].forEach(function(id){ const el=document.getElementById(id); if(el) el.classList.add("hidden"); });
+  const search=document.getElementById("stockCheckHistorySearchCard"); if(search) search.classList.remove("hidden");
+  if (stockCheckHistorySearchPayload_ && document.getElementById("stockCheckHistoryList") && document.getElementById("stockCheckHistoryList").children.length) {
+    const list=document.getElementById("stockCheckHistoryListCard"); if(list) list.classList.remove("hidden");
+  } else {
+    stockCheckHistorySearchPayload_=stockCheckHistoryGetPayload_();
+    stockCheckHistoryOffset_=0;
+    stockCheckHistoryRunPage_(false);
+  }
 }
 
 function stockCheckBackToMenu() {
@@ -2729,6 +2764,9 @@ function stockCheckShowSearch_() {
   const search = document.getElementById("stockCheckSearchCard");
   const list = document.getElementById("stockCheckListCard");
   const product = document.getElementById("stockCheckProductCard");
+  const menu = document.getElementById("stockCheckMenuCard");
+  if (menu) menu.classList.add("hidden");
+  ["stockCheckHistorySearchCard","stockCheckHistoryListCard","stockCheckHistoryDetailCard","stockCheckHistoryEditCard"].forEach(function(id){ const el=document.getElementById(id); if(el) el.classList.add("hidden"); });
   if (search) search.classList.remove("hidden");
   if (list) list.classList.add("hidden");
   if (product) product.classList.add("hidden");
@@ -2837,6 +2875,7 @@ function openStockCheckProduct_(item, source) {
   const search = document.getElementById("stockCheckSearchCard");
   const list = document.getElementById("stockCheckListCard");
   const product = document.getElementById("stockCheckProductCard");
+  ["stockCheckMenuCard","stockCheckHistorySearchCard","stockCheckHistoryListCard","stockCheckHistoryDetailCard","stockCheckHistoryEditCard"].forEach(function(id){ const el=document.getElementById(id); if(el) el.classList.add("hidden"); });
   if (search) search.classList.add("hidden"); if (list) list.classList.add("hidden"); if (product) product.classList.remove("hidden");
   [["stockJan",item.jan],["stockHinban",item.hinban],["stockName",item.name],["stockColor",item.color],["stockSize",item.size],["stockLocation",item.location || "未設定"]].forEach(function(p){ const el=document.getElementById(p[0]); if(el) el.textContent=p[1] || ""; });
   clearStockCheckInputValues_();
@@ -2938,8 +2977,236 @@ function saveStockCheck_(n, increase, decrease) {
   callGas("saveStockCheck", { rowNo:item.rowNo||"", jan:item.jan||"", hinban:item.hinban||"", name:item.name||"", color:item.color||"", size:item.size||"", location:item.location||"", systemQty:n.system, actualQty:n.actual, increaseQty:increase, decreaseQty:decrease, difference:n.difference }).then(function(res){
     endSearchLoading_();
     if(!res || !res.ok){ showStockCheckProductMessage_("error",res && res.message ? res.message : "保存に失敗しました。"); return; }
+    stockCheckHistorySearchPayload_=null;
+    stockCheckHistoryOffset_=0;
+    stockCheckHistoryHasMore_=false;
+    stockCheckHistoryTotal_=0;
+    stockCheckHistoryListScrollY_=0;
+    stockCheckHistorySelectedItem_=null;
+    const historyList=document.getElementById("stockCheckHistoryList"); if(historyList) historyList.innerHTML="";
+    ["stockCheckHistoryListCard","stockCheckHistoryDetailCard","stockCheckHistoryEditCard"].forEach(function(id){ const el=document.getElementById(id); if(el) el.classList.add("hidden"); });
     showStockCheckProductMessage_("success","在庫差異確認を保存しました。");
   }).catch(function(err){ endSearchLoading_(); showStockCheckProductMessage_("error",err && err.message ? err.message : String(err)); });
+}
+
+
+function showStockCheckHistoryMessage_(type, text) {
+  const el=document.getElementById("stockCheckHistoryMessage");
+  if(!el) return;
+  el.className="msg "+type;
+  el.textContent=text||"";
+}
+
+function showStockCheckHistoryDetailMessage_(type, text) {
+  const el=document.getElementById("stockCheckHistoryDetailMessage");
+  if(!el) return;
+  el.className="msg "+type;
+  el.textContent=text||"";
+}
+
+function showStockCheckHistoryEditMessage_(type, text) {
+  const el=document.getElementById("stockCheckHistoryEditMessage");
+  if(!el) return;
+  el.className="msg "+type;
+  el.textContent=text||"";
+}
+
+function stockCheckHistoryGetPayload_() {
+  return {
+    text:(document.getElementById("stockHistoryTextInput")||{}).value||"",
+    jan:(document.getElementById("stockHistoryJanInput")||{}).value||"",
+    hinban:(document.getElementById("stockHistoryHinbanInput")||{}).value||"",
+    name:(document.getElementById("stockHistoryNameInput")||{}).value||"",
+    color:(document.getElementById("stockHistoryColorInput")||{}).value||"",
+    size:(document.getElementById("stockHistorySizeInput")||{}).value||"",
+    location:(document.getElementById("stockHistoryLocationInput")||{}).value||"",
+    savedDate:(document.getElementById("stockHistoryDateInput")||{}).value||""
+  };
+}
+
+function stockCheckHistorySearch() {
+  stockCheckHistorySearchPayload_=stockCheckHistoryGetPayload_();
+  stockCheckHistoryOffset_=0;
+  stockCheckHistoryHasMore_=false;
+  stockCheckHistoryTotal_=0;
+  const list=document.getElementById("stockCheckHistoryList"); if(list) list.innerHTML="";
+  stockCheckHistoryRunPage_(false);
+}
+
+function stockCheckHistoryClearSearch() {
+  ["stockHistoryTextInput","stockHistoryJanInput","stockHistoryHinbanInput","stockHistoryNameInput","stockHistoryColorInput","stockHistorySizeInput","stockHistoryLocationInput","stockHistoryDateInput"].forEach(function(id){ const el=document.getElementById(id); if(el) el.value=""; });
+  stockCheckHistorySearchPayload_=null;
+  stockCheckHistoryOffset_=0;
+  stockCheckHistoryHasMore_=false;
+  stockCheckHistoryTotal_=0;
+  const list=document.getElementById("stockCheckHistoryList"); if(list) list.innerHTML="";
+  const card=document.getElementById("stockCheckHistoryListCard"); if(card) card.classList.add("hidden");
+  showStockCheckHistoryMessage_("","");
+}
+
+function stockCheckHistoryRunPage_(append, restoreScrollY) {
+  if(!stockCheckHistorySearchPayload_) stockCheckHistorySearchPayload_=stockCheckHistoryGetPayload_();
+  const payload=Object.assign({},stockCheckHistorySearchPayload_,{offset:stockCheckHistoryOffset_,limit:STOCK_CHECK_HISTORY_LIMIT_});
+  beginSearchLoading_();
+  callGas("stockCheckHistoryList",payload).then(function(res){
+    endSearchLoading_();
+    if(!res||!res.ok){ showStockCheckHistoryMessage_("error",res&&res.message?res.message:"履歴取得に失敗しました。"); return; }
+    const items=res.items||[];
+    stockCheckHistoryTotal_=Number(res.total||0);
+    stockCheckHistoryOffset_=Number(res.nextOffset||(stockCheckHistoryOffset_+items.length));
+    stockCheckHistoryHasMore_=!!res.hasMore;
+    stockCheckHistoryRenderList_(items,append);
+    showStockCheckHistoryMessage_("info",stockCheckHistoryHasMore_?stockCheckHistoryTotal_+"件中 "+stockCheckHistoryOffset_+"件を表示しています。":stockCheckHistoryTotal_+"件の履歴があります。");
+    if(append&&Number.isFinite(restoreScrollY)) requestAnimationFrame(function(){requestAnimationFrame(function(){window.scrollTo(0,restoreScrollY);});});
+  }).catch(function(err){ endSearchLoading_(); showStockCheckHistoryMessage_("error",err&&err.message?err.message:String(err)); });
+}
+
+function stockCheckHistoryRenderList_(items, append) {
+  const list=document.getElementById("stockCheckHistoryList"), card=document.getElementById("stockCheckHistoryListCard"), search=document.getElementById("stockCheckHistorySearchCard");
+  if(!list||!card) return;
+  if(!append) list.innerHTML="";
+  const old=document.getElementById("stockCheckHistoryLoadMoreWrap"); if(old) old.remove();
+  (items||[]).forEach(function(item){
+    const div=document.createElement("div");
+    div.className="resultItem";
+    div.dataset.confirmationId=String(item.confirmationId||"");
+    div.innerHTML=stockCheckHistoryListHtml_(item);
+    div.onclick=function(){ stockCheckHistoryListScrollY_=window.scrollY||document.documentElement.scrollTop||0; stockCheckHistoryOpenDetail_(item); };
+    list.appendChild(div);
+  });
+  if(stockCheckHistoryHasMore_){
+    const wrap=document.createElement("div"); wrap.id="stockCheckHistoryLoadMoreWrap"; wrap.style.marginTop="12px";
+    const btn=document.createElement("button"); btn.className="primary wide"; btn.textContent="さらに20件読み込む";
+    btn.onclick=function(){ const y=window.scrollY||document.documentElement.scrollTop||0; stockCheckHistoryRunPage_(true,y); };
+    wrap.appendChild(btn); list.appendChild(wrap);
+  }
+  if(search) search.classList.remove("hidden");
+  card.classList.remove("hidden");
+}
+
+function stockCheckHistoryListHtml_(item) {
+  return "<div><strong>"+escapeHtml(item.savedAt||"")+"</strong></div>"+
+    "<div><strong>"+escapeHtml(item.hinban||"")+"</strong> / "+escapeHtml(item.name||"")+"</div>"+
+    "<div class=\"small\">色："+escapeHtml(item.color||"")+" / サイズ："+escapeHtml(item.size||"")+" / ロケ："+escapeHtml(item.location||"未設定")+"</div>"+
+    "<div class=\"small\">システム在庫："+escapeHtml(String(item.systemQty??""))+" / 実在庫："+escapeHtml(String(item.actualQty??""))+" / 差異："+escapeHtml(String(item.difference??""))+"</div>"+
+    "<div class=\"small\">増やす数："+escapeHtml(String(item.increaseQty??""))+" / 減らす数："+escapeHtml(String(item.decreaseQty??""))+"</div>";
+}
+
+function stockCheckHistoryBackToSearch() {
+  const search=document.getElementById("stockCheckHistorySearchCard"), detail=document.getElementById("stockCheckHistoryDetailCard"), edit=document.getElementById("stockCheckHistoryEditCard");
+  if(search) search.classList.remove("hidden"); if(detail) detail.classList.add("hidden"); if(edit) edit.classList.add("hidden");
+  setTimeout(function(){ const view=document.getElementById("stockCheckView"); window.scrollTo(0,Math.max(0,view?view.offsetTop:0)); },0);
+}
+
+function stockCheckHistoryOpenDetail_(item) {
+  stockCheckHistorySelectedItem_=Object.assign({},item||{});
+  ["stockCheckMenuCard","stockCheckSearchCard","stockCheckListCard","stockCheckProductCard","stockCheckHistorySearchCard","stockCheckHistoryListCard","stockCheckHistoryEditCard"].forEach(function(id){ const el=document.getElementById(id); if(el) el.classList.add("hidden"); });
+  const card=document.getElementById("stockCheckHistoryDetailCard"); if(card) card.classList.remove("hidden");
+  stockCheckHistoryFillDetail_();
+  showStockCheckHistoryDetailMessage_("","");
+  window.scrollTo(0,0);
+}
+
+function stockCheckHistoryFillDetail_() {
+  const i=stockCheckHistorySelectedItem_||{};
+  const pairs={stockHistoryDetailSavedAt:i.savedAt,stockHistoryDetailJan:i.jan,stockHistoryDetailHinban:i.hinban,stockHistoryDetailName:i.name,stockHistoryDetailColor:i.color,stockHistoryDetailSize:i.size,stockHistoryDetailLocation:i.location||"未設定",stockHistoryDetailSystemQty:i.systemQty,stockHistoryDetailActualQty:i.actualQty,stockHistoryDetailDifference:i.difference,stockHistoryDetailIncreaseQty:i.increaseQty,stockHistoryDetailDecreaseQty:i.decreaseQty,stockHistoryDetailNote:i.note};
+  Object.keys(pairs).forEach(function(id){ const el=document.getElementById(id); if(el) el.textContent=pairs[id]===undefined||pairs[id]===null?"":String(pairs[id]); });
+}
+
+function stockCheckHistoryBackFromDetail() {
+  const detail=document.getElementById("stockCheckHistoryDetailCard"), list=document.getElementById("stockCheckHistoryListCard"), search=document.getElementById("stockCheckHistorySearchCard");
+  if(detail) detail.classList.add("hidden"); if(search) search.classList.remove("hidden"); if(list) list.classList.remove("hidden");
+  setTimeout(function(){window.scrollTo(0,stockCheckHistoryListScrollY_||0);},0);
+}
+
+function stockCheckHistoryStartEdit() {
+  const i=stockCheckHistorySelectedItem_; if(!i) return;
+  const detail=document.getElementById("stockCheckHistoryDetailCard"), edit=document.getElementById("stockCheckHistoryEditCard");
+  if(detail) detail.classList.add("hidden"); if(edit) edit.classList.remove("hidden");
+  const pairs={stockHistoryEditJan:i.jan,stockHistoryEditHinban:i.hinban,stockHistoryEditName:i.name,stockHistoryEditColor:i.color,stockHistoryEditSize:i.size,stockHistoryEditLocation:i.location||"未設定"};
+  Object.keys(pairs).forEach(function(id){const el=document.getElementById(id);if(el)el.textContent=pairs[id]||"";});
+  const s=document.getElementById("stockHistoryEditSystemQty"),a=document.getElementById("stockHistoryEditActualQty"),n=document.getElementById("stockHistoryEditNote");
+  if(s)s.value=i.systemQty; if(a)a.value=i.actualQty; if(n)n.value=i.note||"";
+  showStockCheckHistoryEditMessage_("","");
+  stockCheckHistoryUpdateDifference();
+  window.scrollTo(0,0);
+}
+
+function stockCheckHistoryCancelEdit() {
+  const detail=document.getElementById("stockCheckHistoryDetailCard"), edit=document.getElementById("stockCheckHistoryEditCard");
+  if(edit) edit.classList.add("hidden"); if(detail) detail.classList.remove("hidden");
+}
+
+function stockCheckHistoryGetEditNumbers_() {
+  const s=document.getElementById("stockHistoryEditSystemQty"),a=document.getElementById("stockHistoryEditActualQty");
+  const sr=s?String(s.value||"").trim():"", ar=a?String(a.value||"").trim():"";
+  const sv=sr!==""?Number(sr):null,av=ar!==""?Number(ar):null;
+  const valid=sr!==""&&ar!==""&&Number.isInteger(sv)&&Number.isInteger(av)&&av>=0;
+  return {system:sv,actual:av,systemRaw:sr,actualRaw:ar,valid:valid,difference:valid?av-sv:null};
+}
+
+function stockCheckHistoryUpdateDifference() {
+  const n=stockCheckHistoryGetEditNumbers_(),box=document.getElementById("stockHistoryEditDifferenceBox"),ir=document.getElementById("stockHistoryEditIncreaseRow"),dr=document.getElementById("stockHistoryEditDecreaseRow"),iv=document.getElementById("stockHistoryEditIncreaseQty"),dv=document.getElementById("stockHistoryEditDecreaseQty");
+  if(ir)ir.classList.add("hidden");if(dr)dr.classList.add("hidden");if(iv)iv.textContent="";if(dv)dv.textContent="";
+  if(!n.valid){if(box)box.textContent="差異：未計算";return;}
+  if(n.difference>0){if(box)box.textContent="差異：+"+n.difference;if(iv)iv.textContent=String(n.difference);if(ir)ir.classList.remove("hidden");}
+  else if(n.difference<0){if(box)box.textContent="差異："+n.difference;if(dv)dv.textContent=String(Math.abs(n.difference));if(dr)dr.classList.remove("hidden");}
+  else if(box)box.textContent="差異なし";
+}
+
+function stockCheckHistoryConfirmUpdate() {
+  const n=stockCheckHistoryGetEditNumbers_();
+  if(!n.valid){showStockCheckHistoryEditMessage_("error","システム在庫・実在庫は整数で入力し、実在庫は0以上にしてください。");return;}
+  const note=(document.getElementById("stockHistoryEditNote")||{}).value||"";
+  let message="この内容で更新しますか？\n\nシステム在庫："+n.system+"\n実在庫："+n.actual+"\n";
+  if(n.difference===0)message+="差異なし";else if(n.difference>0)message+="差異：+"+n.difference+"\n増やす数："+n.difference;else message+="差異："+n.difference+"\n減らす数："+Math.abs(n.difference);
+  openCommonActionConfirm_(message,function(){stockCheckHistoryUpdate_(n,note);});
+}
+
+function stockCheckHistoryUpdate_(n,note) {
+  const i=stockCheckHistorySelectedItem_; if(!i)return;
+  beginSearchLoading_();
+  callGas("stockCheckHistoryUpdate",{confirmationId:i.confirmationId,systemQty:n.system,actualQty:n.actual,note:note,difference:n.difference}).then(function(res){
+    endSearchLoading_();
+    if(!res||!res.ok){showStockCheckHistoryEditMessage_("error",res&&res.message?res.message:"更新に失敗しました。");return;}
+    stockCheckHistorySelectedItem_=Object.assign({},i,res.item||{});
+    const updatedItem=Object.assign({},stockCheckHistorySelectedItem_);
+    const row=document.querySelector('#stockCheckHistoryList [data-confirmation-id="'+cssEscape_(String(i.confirmationId||""))+'"]');
+    if(row){row.innerHTML=stockCheckHistoryListHtml_(updatedItem);row.onclick=function(){stockCheckHistoryListScrollY_=window.scrollY||document.documentElement.scrollTop||0;stockCheckHistoryOpenDetail_(updatedItem);};}
+    const edit=document.getElementById("stockCheckHistoryEditCard"),detail=document.getElementById("stockCheckHistoryDetailCard");if(edit)edit.classList.add("hidden");if(detail)detail.classList.remove("hidden");
+    stockCheckHistoryFillDetail_();showStockCheckHistoryDetailMessage_("success","履歴を更新しました。");
+  }).catch(function(err){endSearchLoading_();showStockCheckHistoryEditMessage_("error",err&&err.message?err.message:String(err));});
+}
+
+function cssEscape_(value) {
+  if(window.CSS&&typeof window.CSS.escape==="function")return window.CSS.escape(value);
+  return String(value||"").replace(/["\\]/g,"\\$&");
+}
+
+function stockCheckHistoryConfirmDelete() {
+  if(!stockCheckHistorySelectedItem_)return;
+  openCommonActionConfirm_("この履歴を削除しますか？",function(){
+    const pin=prompt("PINコードを入力してください。");
+    if(pin===null)return;
+    stockCheckHistoryDelete_(pin);
+  });
+}
+
+function stockCheckHistoryDelete_(pin) {
+  const i=stockCheckHistorySelectedItem_; if(!i)return;
+  beginSearchLoading_();
+  callGas("stockCheckHistoryDelete",{confirmationId:i.confirmationId,pin:pin}).then(function(res){
+    endSearchLoading_();
+    if(!res||!res.ok){showStockCheckHistoryDetailMessage_("error",res&&res.message?res.message:"削除に失敗しました。");return;}
+    const row=document.querySelector('#stockCheckHistoryList [data-confirmation-id="'+cssEscape_(String(i.confirmationId||""))+'"]');if(row)row.remove();
+    stockCheckHistoryTotal_=Math.max(0,stockCheckHistoryTotal_-1);stockCheckHistoryOffset_=Math.max(0,stockCheckHistoryOffset_-1);
+    const loadMoreWrap=document.getElementById("stockCheckHistoryLoadMoreWrap");
+    if(!stockCheckHistoryHasMore_&&loadMoreWrap) loadMoreWrap.remove();
+    stockCheckHistorySelectedItem_=null;
+    const detail=document.getElementById("stockCheckHistoryDetailCard"),list=document.getElementById("stockCheckHistoryListCard"),search=document.getElementById("stockCheckHistorySearchCard");if(detail)detail.classList.add("hidden");if(search)search.classList.remove("hidden");if(list)list.classList.remove("hidden");
+    showStockCheckHistoryMessage_("success","履歴を削除しました。\n"+(stockCheckHistoryHasMore_?stockCheckHistoryTotal_+"件中 "+stockCheckHistoryOffset_+"件を表示しています。":stockCheckHistoryTotal_+"件の履歴があります。"));
+    setTimeout(function(){window.scrollTo(0,stockCheckHistoryListScrollY_||0);},0);
+  }).catch(function(err){endSearchLoading_();showStockCheckHistoryDetailMessage_("error",err&&err.message?err.message:String(err));});
 }
 
 function setupMapPinch_() {

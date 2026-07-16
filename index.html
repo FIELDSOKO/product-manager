@@ -832,9 +832,15 @@
     </div>
 
     <div id="stockCheckView" class="viewSection hidden">
-      <div id="stockCheckSearchCard" class="card">
+      <div id="stockCheckMenuCard" class="card">
         <button class="secondary wide" onclick="stockCheckBackToMenu()">🏠 メインメニューへ戻る</button>
         <h2 class="sectionTitle">在庫差異確認</h2>
+        <button class="primary wide" onclick="openStockCheckInput()">在庫差異確認入力</button>
+        <button class="secondary wide" onclick="openStockCheckHistory()">履歴一覧</button>
+      </div>
+      <div id="stockCheckSearchCard" class="card hidden">
+        <button class="secondary wide" onclick="stockCheckBackToModeMenu()">← 在庫差異確認へ戻る</button>
+        <h2 class="sectionTitle">在庫差異確認入力</h2>
         <button class="primary wide" onclick="startStockCheckScanner()">📷 JANスキャン</button>
         <div class="field" style="margin-top:14px;">
           <label>まとめて入力</label>
@@ -879,6 +885,79 @@
         <div id="stockCheckProductMessage" class="msg"></div>
         <button class="secondary wide" onclick="confirmStockCheckClearInputs()">入力内容をクリア</button>
         <button class="success wide" onclick="confirmStockCheckSave()">保存</button>
+      </div>
+
+      <div id="stockCheckHistorySearchCard" class="card hidden">
+        <button class="secondary wide" onclick="stockCheckBackToModeMenu()">← 在庫差異確認へ戻る</button>
+        <h2 class="sectionTitle">履歴一覧</h2>
+        <div class="field"><label>まとめて検索</label><input id="stockHistoryTextInput" placeholder="JAN・品番・品名・色・サイズ・ロケ"></div>
+        <div class="grid">
+          <div class="field"><label>JAN</label><input id="stockHistoryJanInput" inputmode="numeric"></div>
+          <div class="field"><label>品番</label><input id="stockHistoryHinbanInput"></div>
+          <div class="field"><label>品名</label><input id="stockHistoryNameInput"></div>
+          <div class="field"><label>色</label><input id="stockHistoryColorInput"></div>
+          <div class="field"><label>サイズ</label><input id="stockHistorySizeInput"></div>
+          <div class="field"><label>ロケ</label><input id="stockHistoryLocationInput"></div>
+          <div class="field"><label>保存日</label><input id="stockHistoryDateInput" type="date"></div>
+        </div>
+        <div class="btn-row">
+          <button class="primary" onclick="stockCheckHistorySearch()">🔍 検索</button>
+          <button class="secondary" onclick="stockCheckHistoryClearSearch()">🧹 クリア</button>
+        </div>
+        <div id="stockCheckHistoryMessage" class="msg"></div>
+      </div>
+
+      <div id="stockCheckHistoryListCard" class="card hidden">
+        <button class="secondary wide" onclick="stockCheckHistoryBackToSearch()">← 検索へ戻る</button>
+        <h3>履歴一覧</h3>
+        <div id="stockCheckHistoryList"></div>
+        <button class="secondary wide" onclick="stockCheckHistoryBackToSearch()">← 検索へ戻る</button>
+      </div>
+
+      <div id="stockCheckHistoryDetailCard" class="card hidden">
+        <button class="secondary wide" onclick="stockCheckHistoryBackFromDetail()">← 履歴一覧へ戻る</button>
+        <h2 class="sectionTitle">履歴詳細</h2>
+        <div class="info">
+          <div class="key">保存日時</div><div class="value" id="stockHistoryDetailSavedAt"></div>
+          <div class="key">JAN</div><div class="value" id="stockHistoryDetailJan"></div>
+          <div class="key">品番</div><div class="value" id="stockHistoryDetailHinban"></div>
+          <div class="key">品名</div><div class="value" id="stockHistoryDetailName"></div>
+          <div class="key">色</div><div class="value" id="stockHistoryDetailColor"></div>
+          <div class="key">サイズ</div><div class="value" id="stockHistoryDetailSize"></div>
+          <div class="key">ロケ</div><div class="value" id="stockHistoryDetailLocation"></div>
+          <div class="key">システム在庫</div><div class="value" id="stockHistoryDetailSystemQty"></div>
+          <div class="key">実在庫</div><div class="value" id="stockHistoryDetailActualQty"></div>
+          <div class="key">差異</div><div class="value" id="stockHistoryDetailDifference"></div>
+          <div class="key">増やす数</div><div class="value" id="stockHistoryDetailIncreaseQty"></div>
+          <div class="key">減らす数</div><div class="value" id="stockHistoryDetailDecreaseQty"></div>
+          <div class="key">備考</div><div class="value" id="stockHistoryDetailNote"></div>
+        </div>
+        <div id="stockCheckHistoryDetailMessage" class="msg"></div>
+        <div class="btn-row">
+          <button class="primary" onclick="stockCheckHistoryStartEdit()">編集</button>
+          <button class="danger" onclick="stockCheckHistoryConfirmDelete()">削除</button>
+        </div>
+      </div>
+
+      <div id="stockCheckHistoryEditCard" class="card hidden">
+        <button class="secondary wide" onclick="stockCheckHistoryCancelEdit()">← 詳細へ戻る</button>
+        <h2 class="sectionTitle">履歴編集</h2>
+        <div class="info">
+          <div class="key">JAN</div><div class="value" id="stockHistoryEditJan"></div>
+          <div class="key">品番</div><div class="value" id="stockHistoryEditHinban"></div>
+          <div class="key">品名</div><div class="value" id="stockHistoryEditName"></div>
+          <div class="key">色</div><div class="value" id="stockHistoryEditColor"></div>
+          <div class="key">サイズ</div><div class="value" id="stockHistoryEditSize"></div>
+          <div class="key">ロケ</div><div class="value" id="stockHistoryEditLocation"></div>
+        </div>
+        <div class="field" style="margin-top:14px;"><label>システム在庫</label><input id="stockHistoryEditSystemQty" type="number" step="1" inputmode="numeric" oninput="stockCheckHistoryUpdateDifference()"></div>
+        <div class="field"><label>実在庫</label><input id="stockHistoryEditActualQty" type="number" step="1" inputmode="numeric" oninput="stockCheckHistoryUpdateDifference()"></div>
+        <div class="field"><label>備考</label><textarea id="stockHistoryEditNote"></textarea></div>
+        <div id="stockHistoryEditDifferenceBox" class="stockDifferenceBox">差異：未計算</div>
+        <div id="stockHistoryEditIncreaseRow" class="stockAdjustmentRow hidden"><span>増やす数</span><strong id="stockHistoryEditIncreaseQty"></strong></div>
+        <div id="stockHistoryEditDecreaseRow" class="stockAdjustmentRow hidden"><span>減らす数</span><strong id="stockHistoryEditDecreaseQty"></strong></div>
+        <div id="stockCheckHistoryEditMessage" class="msg"></div>
+        <button class="success wide" onclick="stockCheckHistoryConfirmUpdate()">更新</button>
       </div>
     </div>
 
