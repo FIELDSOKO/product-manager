@@ -553,6 +553,14 @@ function backToResultList() {
   }, 0);
 }
 
+function backToSearchForm_() {
+  setTimeout(function() {
+    const searchView = document.getElementById("searchView");
+    const top = searchView ? searchView.offsetTop : 0;
+    window.scrollTo(0, Math.max(0, top || 0));
+  }, 0);
+}
+
 function goTopHome() {
   // 商品検索・ロケ変更ページ内のトップへ戻る。
   // メインメニューへ戻る処理は showMainSection("menu") のボタンだけで行う。
@@ -1561,18 +1569,19 @@ function inventoryClearDisplayOnly_() {
 
 function inventoryBackToEntry() {
   selectedInventoryItem = null;
-  currentInventoryMarkedListActive = false;
-  currentInventoryMarkedListLocation = "";
-  currentInventoryMarkedListTitle = "";
-  currentInventoryBackButtonLabel = "記入済商品一覧へ戻る";
 
   const productCard = document.getElementById("inventoryProductCard");
   const listCard = document.getElementById("inventoryListCard");
   if (productCard) productCard.classList.add("hidden");
-  if (listCard) listCard.classList.add("hidden");
+  if (listCard) listCard.classList.remove("hidden");
 
   updateInventoryBackToMarkedListButton_();
-  hideInventoryMessage();
+
+  setTimeout(function() {
+    const inventoryView = document.getElementById("inventoryView");
+    const top = inventoryView ? inventoryView.offsetTop : 0;
+    window.scrollTo(0, Math.max(0, top || 0));
+  }, 0);
 }
 
 function inventorySearch() {
@@ -2798,11 +2807,21 @@ function stockCheckRenderList_(items, append) {
     btn.onclick = function(){ const y=window.scrollY || document.documentElement.scrollTop || 0; stockCheckRunSearchPage_(true, y); };
     wrap.appendChild(btn); list.appendChild(wrap);
   }
-  if (search) search.classList.add("hidden");
+  if (search) search.classList.remove("hidden");
   card.classList.remove("hidden");
 }
 
-function stockCheckBackToSearch() { stockCheckShowSearch_(); }
+function stockCheckBackToSearch() {
+  const search = document.getElementById("stockCheckSearchCard");
+  const product = document.getElementById("stockCheckProductCard");
+  if (search) search.classList.remove("hidden");
+  if (product) product.classList.add("hidden");
+  setTimeout(function() {
+    const stockCheckView = document.getElementById("stockCheckView");
+    const top = stockCheckView ? stockCheckView.offsetTop : 0;
+    window.scrollTo(0, Math.max(0, top || 0));
+  }, 0);
+}
 
 function openStockCheckFromInventoryDetail() {
   if (!selectedInventoryItem) return;
@@ -2821,16 +2840,15 @@ function openStockCheckProduct_(item, source) {
   if (search) search.classList.add("hidden"); if (list) list.classList.add("hidden"); if (product) product.classList.remove("hidden");
   [["stockJan",item.jan],["stockHinban",item.hinban],["stockName",item.name],["stockColor",item.color],["stockSize",item.size],["stockLocation",item.location || "未設定"]].forEach(function(p){ const el=document.getElementById(p[0]); if(el) el.textContent=p[1] || ""; });
   clearStockCheckInputValues_();
-  const checkerInput = document.getElementById("stockChecker");
-  if (checkerInput) checkerInput.value = "";
   hideStockCheckProductMessage_();
-  const back=document.getElementById("stockCheckBackBtn"); if(back) back.textContent = source === "stockList" ? "← 在庫確認一覧へ戻る" : "← 移動元の商品詳細へ戻る";
+  const back=document.getElementById("stockCheckBackBtn"); if(back) back.textContent = source === "stockList" ? "← 在庫差異確認一覧へ戻る" : "← 移動元の商品詳細へ戻る";
 }
 
 function stockCheckBackFromProduct() {
   if (stockCheckReturnSource_ === "stockList") {
     const product=document.getElementById("stockCheckProductCard"), list=document.getElementById("stockCheckListCard");
-    if(product) product.classList.add("hidden"); if(list) list.classList.remove("hidden");
+    const search=document.getElementById("stockCheckSearchCard");
+    if(product) product.classList.add("hidden"); if(search) search.classList.remove("hidden"); if(list) list.classList.remove("hidden");
     setTimeout(function(){ window.scrollTo(0, stockCheckListScrollY_ || 0); },0);
     return;
   }
@@ -2898,11 +2916,9 @@ function confirmStockCheckClearInputs() {
 function confirmStockCheckSave() {
   if(!stockCheckSelectedItem_) return;
   const n=getStockCheckNumbers_();
-  const checker=String((document.getElementById("stockChecker") || {}).value || "").trim();
   if(!n.hasBoth){ showStockCheckProductMessage_("error","システム在庫と実在庫を入力してください。"); return; }
   if(!n.integer){ showStockCheckProductMessage_("error","システム在庫・実在庫は整数で入力してください。"); return; }
   if(!n.actualNonNegative){ showStockCheckProductMessage_("error","実在庫は0以上で入力してください。"); return; }
-  if(!checker){ showStockCheckProductMessage_("error","確認者を入力してください。"); return; }
   hideStockCheckProductMessage_();
   const increase=n.difference>0?n.difference:"", decrease=n.difference<0?Math.abs(n.difference):"";
   let message="この内容で保存しますか？\n\nシステム在庫："+n.system+"\n実在庫："+n.actual+"\n";
@@ -2913,17 +2929,16 @@ function confirmStockCheckSave() {
   } else {
     message+="差異："+n.difference+"\n減らす数："+decrease;
   }
-  message+="\n確認者："+checker;
-  openCommonActionConfirm_(message, function(){ saveStockCheck_(n, checker, increase, decrease); });
+  openCommonActionConfirm_(message, function(){ saveStockCheck_(n, increase, decrease); });
 }
 
-function saveStockCheck_(n, checker, increase, decrease) {
+function saveStockCheck_(n, increase, decrease) {
   const item=stockCheckSelectedItem_;
   beginSearchLoading_();
-  callGas("saveStockCheck", { rowNo:item.rowNo||"", jan:item.jan||"", hinban:item.hinban||"", name:item.name||"", color:item.color||"", size:item.size||"", location:item.location||"", systemQty:n.system, actualQty:n.actual, increaseQty:increase, decreaseQty:decrease, difference:n.difference, checker:checker }).then(function(res){
+  callGas("saveStockCheck", { rowNo:item.rowNo||"", jan:item.jan||"", hinban:item.hinban||"", name:item.name||"", color:item.color||"", size:item.size||"", location:item.location||"", systemQty:n.system, actualQty:n.actual, increaseQty:increase, decreaseQty:decrease, difference:n.difference }).then(function(res){
     endSearchLoading_();
     if(!res || !res.ok){ showStockCheckProductMessage_("error",res && res.message ? res.message : "保存に失敗しました。"); return; }
-    showStockCheckProductMessage_("success","在庫確認を保存しました。");
+    showStockCheckProductMessage_("success","在庫差異確認を保存しました。");
   }).catch(function(err){ endSearchLoading_(); showStockCheckProductMessage_("error",err && err.message ? err.message : String(err)); });
 }
 

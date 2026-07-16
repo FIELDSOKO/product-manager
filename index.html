@@ -654,7 +654,7 @@
       <button class="primary wide menuBtn" onclick="showMainSection('search')">① 商品検索・ロケ変更</button>
       <button class="secondary wide menuBtn" onclick="openInventoryMenu()">② 棚卸し記入</button>
       <button class="secondary wide menuBtn" onclick="openMapMenu()">③ 棚卸しマップ</button>
-      <button class="secondary wide menuBtn" onclick="openStockCheckMenu()">④ 在庫確認</button>
+      <button class="secondary wide menuBtn" onclick="openStockCheckMenu()">④ 在庫差異確認</button>
     </div>
 
     <div id="searchView" class="viewSection hidden">
@@ -706,7 +706,7 @@
     <div class="card hidden" id="productCard">
       <div class="detailNavRow">
         <button id="backToResultListBtn" class="secondary wide hidden" onclick="backToResultList()">← 一覧に戻る</button>
-        <button id="topFromProductBtn" class="secondary wide" onclick="goTopHome()">🏠 トップへ戻る</button>
+        <button id="topFromProductBtn" class="secondary wide" onclick="backToSearchForm_()">← 検索へ戻る</button>
       </div>
       <div class="info">
         <div class="key">品番</div><div class="value" id="vHinban"></div>
@@ -730,10 +730,11 @@
     </div>
 
     <div class="card hidden" id="multiCard">
-      <button id="topFromResultListBtn" class="secondary wide" onclick="goTopHome()">🏠 トップへ戻る</button>
+      <button id="topFromResultListBtn" class="secondary wide" onclick="backToSearchForm_()">← 検索へ戻る</button>
       <div style="font-weight:900;">検索結果</div>
       <div class="small">複数見つかりました。変更したい商品を選んでください。</div>
       <div id="resultList"></div>
+      <button id="bottomFromResultListBtn" class="secondary wide" onclick="backToSearchForm_()">← 検索へ戻る</button>
     </div>
 
     </div>
@@ -815,7 +816,7 @@
         <div id="invStateLabel" class="inventoryStateLabel">状態：未記入</div>
         <button id="inventoryBackToSearchListBtn" class="secondary wide hidden" onclick="inventoryBackToSearchResults()">← 検索結果一覧へ戻る</button>
         <button id="inventoryBackToMarkedListBtn" class="secondary wide hidden" onclick="inventoryBackToMarkedList()">記入済商品一覧へ戻る</button>
-        <button class="primary wide" onclick="openStockCheckFromInventoryDetail()">この商品の在庫確認</button>
+        <button class="primary wide" onclick="openStockCheckFromInventoryDetail()">この商品の在庫差異確認</button>
         <div class="btn-row">
           <button class="success" onclick="inventoryMarkCurrent()">記入済</button>
           <button class="secondary" onclick="inventoryUnmarkCurrent()">記入済解除</button>
@@ -824,15 +825,16 @@
 
       <div class="card hidden" id="inventoryListCard">
         <h3 id="inventoryListTitle">記入済商品一覧</h3>
-        <button id="inventoryBackToEntryBtn" class="secondary wide" onclick="inventoryBackToEntry()">棚卸し記入へ戻る</button>
+        <button id="inventoryBackToEntryBtn" class="secondary wide" onclick="inventoryBackToEntry()">← 検索へ戻る</button>
         <div id="inventoryList"></div>
+        <button id="inventoryBackToEntryBottomBtn" class="secondary wide" onclick="inventoryBackToEntry()">← 検索へ戻る</button>
       </div>
     </div>
 
     <div id="stockCheckView" class="viewSection hidden">
       <div id="stockCheckSearchCard" class="card">
         <button class="secondary wide" onclick="stockCheckBackToMenu()">🏠 メインメニューへ戻る</button>
-        <h2 class="sectionTitle">在庫確認</h2>
+        <h2 class="sectionTitle">在庫差異確認</h2>
         <button class="primary wide" onclick="startStockCheckScanner()">📷 JANスキャン</button>
         <div class="field" style="margin-top:14px;">
           <label>まとめて入力</label>
@@ -854,9 +856,10 @@
         <div id="stockCheckMessage" class="msg"></div>
       </div>
       <div id="stockCheckListCard" class="card hidden">
+        <button class="secondary wide" onclick="stockCheckBackToSearch()">← 検索へ戻る</button>
         <h3>検索結果</h3>
-        <button class="secondary wide" onclick="stockCheckBackToSearch()">← 在庫確認検索へ戻る</button>
         <div id="stockCheckList"></div>
+        <button class="secondary wide" onclick="stockCheckBackToSearch()">← 検索へ戻る</button>
       </div>
       <div id="stockCheckProductCard" class="card hidden">
         <button class="secondary wide" onclick="stockCheckBackFromProduct()" id="stockCheckBackBtn">← 戻る</button>
@@ -873,7 +876,6 @@
         <div id="stockDifferenceBox" class="stockDifferenceBox">差異：未計算</div>
         <div id="stockIncreaseRow" class="stockAdjustmentRow hidden"><span>増やす数</span><strong id="stockIncreaseQty"></strong></div>
         <div id="stockDecreaseRow" class="stockAdjustmentRow hidden"><span>減らす数</span><strong id="stockDecreaseQty"></strong></div>
-        <div class="field" style="margin-top:14px;"><label>確認者</label><input id="stockChecker" placeholder="確認者名"></div>
         <div id="stockCheckProductMessage" class="msg"></div>
         <button class="secondary wide" onclick="confirmStockCheckClearInputs()">入力内容をクリア</button>
         <button class="success wide" onclick="confirmStockCheckSave()">保存</button>
@@ -905,7 +907,7 @@
         <div class="mapStatusGuide" aria-label="マップ状態色ガイド">
           <span class="mapStatusGuideItem">
             <span class="mapStatusGuideSwatch mapStatusGuideSwatchComplete" aria-hidden="true"></span>
-            緑：在庫確認完了
+            緑：在庫差異確認完了
           </span>
           <span class="mapStatusGuideItem">
             <span class="mapStatusGuideSwatch mapStatusGuideSwatchProgress" aria-hidden="true"></span>
