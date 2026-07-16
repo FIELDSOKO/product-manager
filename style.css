@@ -74,7 +74,8 @@ label {
 }
 
 input,
-textarea {
+textarea,
+select {
   width: 100%;
   border: 1px solid #d1d5db;
   border-radius: 12px;
@@ -90,7 +91,8 @@ textarea {
 }
 
 input:focus,
-textarea:focus {
+textarea:focus,
+select:focus {
   border-color: #2563eb;
   box-shadow: 0 0 0 3px rgba(37,99,235,0.15);
 }
@@ -816,4 +818,26 @@ body.map-active .mapOuter {
 #mapActionSheet .mapSheet {
   max-height: calc(100dvh - env(safe-area-inset-top));
   overflow-y: auto;
+}
+
+
+/* 在庫確認：独立追加画面 */
+.stockDifferenceBox {
+  margin-top: 12px;
+  padding: 14px;
+  border-radius: 14px;
+  background: #eff6ff;
+  text-align: center;
+  font-weight: 900;
+}
+
+.stockAdjustmentRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding: 13px 14px;
+  border-radius: 12px;
+  background: #f3f4f6;
+  font-weight: 900;
 }

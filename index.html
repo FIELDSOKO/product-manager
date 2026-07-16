@@ -654,6 +654,7 @@
       <button class="primary wide menuBtn" onclick="showMainSection('search')">① 商品検索・ロケ変更</button>
       <button class="secondary wide menuBtn" onclick="openInventoryMenu()">② 棚卸し記入</button>
       <button class="secondary wide menuBtn" onclick="openMapMenu()">③ 棚卸しマップ</button>
+      <button class="secondary wide menuBtn" onclick="openStockCheckMenu()">④ 在庫確認</button>
     </div>
 
     <div id="searchView" class="viewSection hidden">
@@ -776,6 +777,14 @@
             <label>ロケ</label>
             <input id="invLocationInput" placeholder="B-1">
           </div>
+          <div class="field">
+            <label>状態</label>
+            <select id="invStatusInput">
+              <option value="all" selected>すべて</option>
+              <option value="unmarked">未記入</option>
+              <option value="marked">記入済</option>
+            </select>
+          </div>
         </div>
 
         <div class="btn-row">
@@ -806,6 +815,7 @@
         <div id="invStateLabel" class="inventoryStateLabel">状態：未記入</div>
         <button id="inventoryBackToSearchListBtn" class="secondary wide hidden" onclick="inventoryBackToSearchResults()">← 検索結果一覧へ戻る</button>
         <button id="inventoryBackToMarkedListBtn" class="secondary wide hidden" onclick="inventoryBackToMarkedList()">記入済商品一覧へ戻る</button>
+        <button class="primary wide" onclick="openStockCheckFromInventoryDetail()">この商品の在庫確認</button>
         <div class="btn-row">
           <button class="success" onclick="inventoryMarkCurrent()">記入済</button>
           <button class="secondary" onclick="inventoryUnmarkCurrent()">記入済解除</button>
@@ -816,6 +826,57 @@
         <h3 id="inventoryListTitle">記入済商品一覧</h3>
         <button id="inventoryBackToEntryBtn" class="secondary wide" onclick="inventoryBackToEntry()">棚卸し記入へ戻る</button>
         <div id="inventoryList"></div>
+      </div>
+    </div>
+
+    <div id="stockCheckView" class="viewSection hidden">
+      <div id="stockCheckSearchCard" class="card">
+        <button class="secondary wide" onclick="stockCheckBackToMenu()">🏠 メインメニューへ戻る</button>
+        <h2 class="sectionTitle">在庫確認</h2>
+        <button class="primary wide" onclick="startStockCheckScanner()">📷 JANスキャン</button>
+        <div class="field" style="margin-top:14px;">
+          <label>まとめて入力</label>
+          <textarea id="stockTextInput" placeholder="例：4901234567890&#10;例：ABC 黒 23cm"></textarea>
+          <div class="small">棚卸し記入と同じ検索条件で探せます。</div>
+        </div>
+        <div class="grid">
+          <div class="field"><label>JAN</label><input id="stockJanInput" inputmode="numeric" placeholder="4901234567890"></div>
+          <div class="field"><label>品番</label><input id="stockHinbanInput" placeholder="ABC"></div>
+          <div class="field"><label>品名</label><input id="stockNameInput" placeholder="商品名の一部"></div>
+          <div class="field"><label>色</label><input id="stockColorInput" placeholder="黒"></div>
+          <div class="field"><label>サイズ</label><input id="stockSizeInput" placeholder="23cm"></div>
+          <div class="field"><label>ロケ</label><input id="stockLocationInput" placeholder="B-1"></div>
+        </div>
+        <div class="btn-row">
+          <button class="primary" onclick="stockCheckSearch()">🔍 検索</button>
+          <button class="secondary" onclick="stockCheckClearSearch()">🧹 クリア</button>
+        </div>
+        <div id="stockCheckMessage" class="msg"></div>
+      </div>
+      <div id="stockCheckListCard" class="card hidden">
+        <h3>検索結果</h3>
+        <button class="secondary wide" onclick="stockCheckBackToSearch()">← 在庫確認検索へ戻る</button>
+        <div id="stockCheckList"></div>
+      </div>
+      <div id="stockCheckProductCard" class="card hidden">
+        <button class="secondary wide" onclick="stockCheckBackFromProduct()" id="stockCheckBackBtn">← 戻る</button>
+        <div class="info">
+          <div class="key">JAN</div><div class="value" id="stockJan"></div>
+          <div class="key">品番</div><div class="value" id="stockHinban"></div>
+          <div class="key">品名</div><div class="value" id="stockName"></div>
+          <div class="key">色</div><div class="value" id="stockColor"></div>
+          <div class="key">サイズ</div><div class="value" id="stockSize"></div>
+          <div class="key">ロケ</div><div class="value" id="stockLocation"></div>
+        </div>
+        <div class="field" style="margin-top:14px;"><label>システム在庫</label><input id="stockSystemQty" inputmode="numeric" type="number" step="1" oninput="updateStockCheckDifference()"></div>
+        <div class="field"><label>実在庫</label><input id="stockActualQty" inputmode="numeric" type="number" step="1" oninput="updateStockCheckDifference()"></div>
+        <div id="stockDifferenceBox" class="stockDifferenceBox">差異：未計算</div>
+        <div id="stockIncreaseRow" class="stockAdjustmentRow hidden"><span>増やす数</span><strong id="stockIncreaseQty"></strong></div>
+        <div id="stockDecreaseRow" class="stockAdjustmentRow hidden"><span>減らす数</span><strong id="stockDecreaseQty"></strong></div>
+        <div class="field" style="margin-top:14px;"><label>確認者</label><input id="stockChecker" placeholder="確認者名"></div>
+        <div id="stockCheckProductMessage" class="msg"></div>
+        <button class="secondary wide" onclick="confirmStockCheckClearInputs()">入力内容をクリア</button>
+        <button class="success wide" onclick="confirmStockCheckSave()">保存</button>
       </div>
     </div>
 
