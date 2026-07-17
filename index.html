@@ -899,7 +899,17 @@
           <div class="field"><label>サイズ</label><input id="stockHistorySizeInput"></div>
           <div class="field"><label>ロケ</label><input id="stockHistoryLocationInput"></div>
         </div>
-        <div class="field stockHistoryDateField"><label>保存日</label><div class="stockHistoryDateInputWrap"><input id="stockHistoryDateInput" type="date"></div></div>
+        <div class="field stockHistoryDateField">
+          <label>保存日</label>
+          <div class="stockHistoryDateInputWrap">
+            <button type="button" id="stockHistoryDateDisplay" class="stockHistoryDateDisplay" onclick="openStockHistoryDatePicker_()" aria-label="保存日を選択">
+              <span id="stockHistoryDateDisplayText" class="stockHistoryDateDisplayText"></span>
+              <span class="stockHistoryDateCalendarIcon" aria-hidden="true">📅</span>
+            </button>
+            <input id="stockHistoryDatePicker" class="stockHistoryDatePicker" type="date" tabindex="-1" aria-hidden="true">
+            <input id="stockHistoryDateInput" type="hidden">
+          </div>
+        </div>
         <div class="btn-row">
           <button class="primary" onclick="stockCheckHistorySearch()">🔍 検索</button>
           <button class="secondary" onclick="stockCheckHistoryClearSearch()">🧹 クリア</button>
