@@ -2736,7 +2736,6 @@ function openStockCheckInput() {
 }
 
 function openStockCheckHistory() {
-  setupStockHistoryDatePicker_();
   const menu=document.getElementById("stockCheckMenuCard"); if(menu) menu.classList.add("hidden");
   ["stockCheckSearchCard","stockCheckListCard","stockCheckProductCard","stockCheckHistoryListCard","stockCheckHistoryDetailCard","stockCheckHistoryEditCard"].forEach(function(id){ const el=document.getElementById(id); if(el) el.classList.add("hidden"); });
   const search=document.getElementById("stockCheckHistorySearchCard"); if(search) search.classList.remove("hidden");
@@ -3041,43 +3040,6 @@ function showStockCheckHistoryEditMessage_(type, text) {
 }
 
 
-function setupStockHistoryDatePicker_() {
-  const picker=document.getElementById("stockHistoryDatePicker");
-  if(!picker || picker.dataset.ready==="1") return;
-  picker.dataset.ready="1";
-  picker.addEventListener("change",function(){
-    const committed=document.getElementById("stockHistoryDateInput");
-    if(committed) committed.value=picker.value||"";
-    updateStockHistoryDateDisplay_();
-  });
-  picker.addEventListener("blur",function(){
-    setTimeout(function(){
-      const committed=document.getElementById("stockHistoryDateInput");
-      picker.value=committed ? committed.value||"" : "";
-    },0);
-  });
-  updateStockHistoryDateDisplay_();
-}
-
-function updateStockHistoryDateDisplay_() {
-  const committed=document.getElementById("stockHistoryDateInput");
-  const text=document.getElementById("stockHistoryDateDisplayText");
-  if(text) text.textContent=committed && committed.value ? committed.value : "";
-}
-
-function openStockHistoryDatePicker_() {
-  setupStockHistoryDatePicker_();
-  const picker=document.getElementById("stockHistoryDatePicker");
-  const committed=document.getElementById("stockHistoryDateInput");
-  if(!picker) return;
-  picker.value=committed ? committed.value||"" : "";
-  if(typeof picker.showPicker==="function"){
-    try{ picker.showPicker(); return; }catch(e){}
-  }
-  picker.focus();
-  picker.click();
-}
-
 function stockCheckHistoryGetPayload_() {
   return {
     text:(document.getElementById("stockHistoryTextInput")||{}).value||"",
@@ -3101,8 +3063,7 @@ function stockCheckHistorySearch() {
 }
 
 function stockCheckHistoryClearSearch() {
-  ["stockHistoryTextInput","stockHistoryJanInput","stockHistoryHinbanInput","stockHistoryNameInput","stockHistoryColorInput","stockHistorySizeInput","stockHistoryLocationInput","stockHistoryDateInput","stockHistoryDatePicker"].forEach(function(id){ const el=document.getElementById(id); if(el) el.value=""; });
-  updateStockHistoryDateDisplay_();
+  ["stockHistoryTextInput","stockHistoryJanInput","stockHistoryHinbanInput","stockHistoryNameInput","stockHistoryColorInput","stockHistorySizeInput","stockHistoryLocationInput","stockHistoryDateInput"].forEach(function(id){ const el=document.getElementById(id); if(el) el.value=""; });
   stockCheckHistorySearchPayload_=null;
   stockCheckHistoryOffset_=0;
   stockCheckHistoryHasMore_=false;

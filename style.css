@@ -862,75 +862,26 @@ body {
   width: 100%;
   min-width: 0;
   max-width: 100%;
-  overflow: hidden;
   box-sizing: border-box;
 }
 
 #stockCheckHistorySearchCard .stockHistoryDateInputWrap {
   display: block;
-  position: relative;
   width: 100%;
   min-width: 0;
   max-width: 100%;
-  inline-size: 100%;
-  min-inline-size: 0;
-  max-inline-size: 100%;
-  overflow: hidden;
-  contain: inline-size;
   box-sizing: border-box;
 }
 
-#stockCheckHistorySearchCard .stockHistoryDateDisplay {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+#stockCheckHistorySearchCard #stockHistoryDateInput {
+  display: block;
   box-sizing: border-box;
-  width: 100%;
-  min-width: 0;
-  max-width: 100%;
-  height: auto;
-  min-height: 49px;
-  margin: 0;
-  padding: 13px 14px;
-  border: 1px solid #d1d5db;
-  border-radius: 12px;
-  background: #ffffff;
-  color: #111827;
-  font-size: 17px;
-  font-weight: 400;
-  line-height: normal;
-  text-align: left;
-  overflow: hidden;
-}
-
-#stockCheckHistorySearchCard .stockHistoryDateDisplay:focus {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37,99,235,0.15);
-}
-
-#stockCheckHistorySearchCard .stockHistoryDateDisplayText {
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-}
-
-#stockCheckHistorySearchCard .stockHistoryDateCalendarIcon {
-  flex: 0 0 auto;
-  margin-left: 10px;
-  font-size: 16px;
-  line-height: 1;
-}
-
-#stockCheckHistorySearchCard .stockHistoryDatePicker {
-  position: fixed;
-  left: 0;
-  bottom: 0;
-  width: 1px !important;
-  min-width: 1px !important;
-  max-width: 1px !important;
-  height: 1px;
-  padding: 0;
-  border: 0;
-  opacity: 0.01;
-  pointer-events: none;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  inline-size: 100% !important;
+  min-inline-size: 0 !important;
+  max-inline-size: 100% !important;
+  -webkit-min-logical-width: 0 !important;
+  -webkit-max-logical-width: 100% !important;
 }
