@@ -707,9 +707,12 @@ async function toggleScanner() {
     return;
   }
 
-  scannerMode = activeSection === "inventory" ? "inventory" : activeSection === "stockCheck" ? "stockCheck" : "search";
+  if (scannerMode !== "stockCheckHistory") {
+    scannerMode = activeSection === "inventory" ? "inventory" : activeSection === "stockCheck" ? "stockCheck" : "search";
+  }
 
   if (typeof ZXing === "undefined") {
+    if (scannerMode === "stockCheckHistory") scannerMode = "search";
     showMessage("error", "JAN読取ライブラリを読み込めませんでした。ページを再読み込みしてください。");
     return;
   }
@@ -767,6 +770,7 @@ async function toggleScanner() {
   } catch (err) {
     await stopScanner();
     closeScannerView_();
+    if (scannerMode === "stockCheckHistory") scannerMode = "search";
     showMessage("error", "カメラを起動できませんでした。\n\n原因：" + (err && err.message ? err.message : String(err)));
   }
 }
@@ -894,6 +898,7 @@ function startDecodeWithBrowserDefault_(deviceId, video, tryHarder, allowNullRet
 
     stopScanner().then(function() {
       closeScannerView_();
+      if (scannerMode === "stockCheckHistory") scannerMode = "search";
       showMessage("error", "JAN読取の開始に失敗しました。\n\n原因：" + (err && err.message ? err.message : String(err)));
     });
   });
@@ -1408,6 +1413,16 @@ async function confirmScanJan_(jan) {
 
   await stopScanner();
   closeScannerView_();
+
+  if (scannerMode === "stockCheckHistory") {
+    const historyJanInput = document.getElementById("stockHistoryJanInput");
+    const historyTextInput = document.getElementById("stockHistoryTextInput");
+    if (historyJanInput) historyJanInput.value = jan;
+    if (historyTextInput) historyTextInput.value = "";
+    stockCheckHistorySearch();
+    scannerMode = "search";
+    return;
+  }
 
   if (scannerMode === "stockCheck") {
     const stockJanInput = document.getElementById("stockJanInput");
@@ -2759,6 +2774,12 @@ function startStockCheckScanner() {
   scannerMode = "stockCheck";
   toggleScanner();
 }
+
+function startStockCheckHistoryScanner() {
+  scannerMode = "stockCheckHistory";
+  toggleScanner();
+}
+
 
 function showStockCheckMessage_(type, text) {
   const el = document.getElementById("stockCheckMessage");
