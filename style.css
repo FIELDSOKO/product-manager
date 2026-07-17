@@ -844,44 +844,23 @@ body.map-active .mapOuter {
 }
 
 
-/* 履歴検索：保存日幅・ページ横スクロール修正（マップ内部は対象外） */
-html,
-body {
-  max-width: 100%;
-  overflow-x: hidden;
-}
-
+/* 履歴検索：iPhone Safariの保存日入力欄をカード内へ収める */
 #stockCheckHistorySearchCard,
-#stockCheckHistorySearchCard .grid,
-#stockCheckHistorySearchCard .field {
-  min-width: 0;
-  max-width: 100%;
-}
-
-#stockCheckHistorySearchCard .stockHistoryDateField {
+#stockCheckHistorySearchCard .stockHistoryDateField,
+#stockCheckHistorySearchCard .stockHistoryDateInputWrap {
   width: 100%;
   min-width: 0;
   max-width: 100%;
-  box-sizing: border-box;
 }
 
 #stockCheckHistorySearchCard .stockHistoryDateInputWrap {
-  display: block;
-  width: 100%;
-  min-width: 0;
-  max-width: 100%;
-  box-sizing: border-box;
+  display: flex;
 }
 
 #stockCheckHistorySearchCard #stockHistoryDateInput {
   display: block;
-  box-sizing: border-box;
-  width: 100% !important;
-  min-width: 0 !important;
-  max-width: 100% !important;
-  inline-size: 100% !important;
-  min-inline-size: 0 !important;
-  max-inline-size: 100% !important;
-  -webkit-min-logical-width: 0 !important;
-  -webkit-max-logical-width: 100% !important;
+  flex: 1 1 0%;
+  width: 0;
+  min-width: 0;
+  max-width: 100%;
 }
