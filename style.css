@@ -859,12 +859,19 @@ body {
 }
 
 #stockCheckHistorySearchCard .stockHistoryDateField {
-  grid-column: 1 / -1;
-}
-
-#stockCheckHistorySearchCard input[type="date"] {
-  display: block;
   width: 100%;
   min-width: 0;
   max-width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+#stockCheckHistorySearchCard .stockHistoryDateField input[type="date"] {
+  display: block;
+  box-sizing: border-box;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  inline-size: 100% !important;
+  min-inline-size: 0 !important;
 }
