@@ -866,6 +866,20 @@ body {
   box-sizing: border-box;
 }
 
+#stockCheckHistorySearchCard .stockHistoryDateInputWrap {
+  display: block;
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  inline-size: 100%;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  overflow: hidden;
+  contain: inline-size;
+  box-sizing: border-box;
+}
+
 #stockCheckHistorySearchCard .stockHistoryDateField input[type="date"] {
   display: block;
   box-sizing: border-box;
@@ -874,4 +888,7 @@ body {
   max-width: 100% !important;
   inline-size: 100% !important;
   min-inline-size: 0 !important;
+  max-inline-size: 100% !important;
+  -webkit-min-logical-width: 0 !important;
+  -webkit-max-logical-width: 100% !important;
 }
