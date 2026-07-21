@@ -289,7 +289,32 @@ function showMainSection(section) {
 }
 
 function backToAppHome_() {
+  // どの内部画面から実行されても、アプリ起動直後のホーム画面へ確実に戻す。
+  try {
+    const stopResult = stopScanner();
+    if (stopResult && typeof stopResult.catch === "function") stopResult.catch(function() {});
+  } catch (e) {}
+  closeScannerView_();
+  scannerMode = "search";
+
+  clearAll();
+  inventoryBackToSearchInitial_();
+
+  stockCheckSelectedItem_ = null;
+  stockCheckListScrollY_ = 0;
+  stockCheckReturnSource_ = "stockList";
+  clearStockCheckInputValues_();
+  hideStockCheckProductMessage_();
+  stockCheckClearSearch();
+  stockCheckHistoryClearSearch();
+  stockCheckHistoryListScrollY_ = 0;
+  stockCheckHistorySelectedItem_ = null;
+  hideStockCheckHistoryDetailMessage_();
+  hideStockCheckHistoryEditMessage_();
+  stockCheckShowModeMenu_();
+
   showMainSection("menu");
+  window.scrollTo(0, 0);
 }
 
 function openInventoryMenu() {
