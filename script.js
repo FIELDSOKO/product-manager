@@ -294,27 +294,60 @@ function backToAppHome_() {
     const stopResult = stopScanner();
     if (stopResult && typeof stopResult.catch === "function") stopResult.catch(function() {});
   } catch (e) {}
-  closeScannerView_();
+  try { closeScannerView_(); } catch (e) {}
   scannerMode = "search";
 
-  clearAll();
-  inventoryBackToSearchInitial_();
+  try { clearAll(); } catch (e) {}
+  try { inventoryBackToSearchInitial_(); } catch (e) {}
 
-  stockCheckSelectedItem_ = null;
-  stockCheckListScrollY_ = 0;
-  stockCheckReturnSource_ = "stockList";
-  clearStockCheckInputValues_();
-  hideStockCheckProductMessage_();
-  stockCheckClearSearch();
-  stockCheckHistoryClearSearch();
-  stockCheckHistoryListScrollY_ = 0;
-  stockCheckHistorySelectedItem_ = null;
-  hideStockCheckHistoryDetailMessage_();
-  hideStockCheckHistoryEditMessage_();
-  stockCheckShowModeMenu_();
+  try {
+    stockCheckSelectedItem_ = null;
+    stockCheckListScrollY_ = 0;
+    stockCheckReturnSource_ = "stockList";
+    clearStockCheckInputValues_();
+    hideStockCheckProductMessage_();
+    stockCheckClearSearch();
+    stockCheckHistoryClearSearch();
+    stockCheckHistoryListScrollY_ = 0;
+    stockCheckHistorySelectedItem_ = null;
+    hideStockCheckHistoryDetailMessage_();
+    hideStockCheckHistoryEditMessage_();
+    stockCheckShowModeMenu_();
+  } catch (e) {}
 
-  showMainSection("menu");
-  window.scrollTo(0, 0);
+  try {
+    showMainSection("menu");
+  } catch (e) {
+    activeSection = "menu";
+    const menu = document.getElementById("mainMenu");
+    const search = document.getElementById("searchView");
+    const inv = document.getElementById("inventoryView");
+    const map = document.getElementById("mapView");
+    const stockCheck = document.getElementById("stockCheckView");
+    if (menu) menu.classList.remove("hidden");
+    if (search) search.classList.add("hidden");
+    if (inv) inv.classList.add("hidden");
+    if (map) map.classList.add("hidden");
+    if (stockCheck) stockCheck.classList.add("hidden");
+    if (document.body) document.body.classList.remove("map-active");
+  }
+  try { window.scrollTo(0, 0); } catch (e) {}
+
+  // 補助初期化や画面切替処理の成否にかかわらず、最終状態を必ずホーム画面に固定する。
+  activeSection = "menu";
+  try {
+    const menu = document.getElementById("mainMenu");
+    const search = document.getElementById("searchView");
+    const inv = document.getElementById("inventoryView");
+    const map = document.getElementById("mapView");
+    const stockCheck = document.getElementById("stockCheckView");
+    if (menu) menu.classList.remove("hidden");
+    if (search) search.classList.add("hidden");
+    if (inv) inv.classList.add("hidden");
+    if (map) map.classList.add("hidden");
+    if (stockCheck) stockCheck.classList.add("hidden");
+    if (document.body) document.body.classList.remove("map-active");
+  } catch (e) {}
 }
 
 function openInventoryMenu() {
