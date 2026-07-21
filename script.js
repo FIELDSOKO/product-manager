@@ -3142,8 +3142,8 @@ function mapShowSelectedProductsByStatus(filter) {
 
 function openStockCheckMenu() {
   stockCheckReturnSource_ = "stockList";
-  showMainSection("stockCheck");
   stockCheckShowModeMenu_();
+  showMainSection("stockCheck");
 }
 
 function stockCheckShowModeMenu_() {
