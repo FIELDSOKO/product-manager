@@ -914,8 +914,8 @@ body.map-active .mapOuter {
 }
 
 .scannerGuide.jan-candidate span {
-  border-color: #ffe600;
-  filter: drop-shadow(0 0 4px rgba(255, 230, 0, 1)) drop-shadow(0 0 11px rgba(255, 196, 0, 0.95));
+  border-color: #20f070;
+  filter: drop-shadow(0 0 5px rgba(32, 240, 112, 1)) drop-shadow(0 0 13px rgba(0, 220, 90, 0.95));
 }
 
 .scannerGuide.jan-success span {
@@ -1002,6 +1002,7 @@ button.success:active,
 #inventoryBackToEntryBtn:active,
 #inventoryBackToEntryBottomBtn:active,
 #stockCheckBackToSearchInitialBtn:active,
-#stockCheckListCard > button.secondary:active {
+#stockCheckListCard > button.secondary:active,
+.buttonPressActive {
   transform: scale(0.96);
 }

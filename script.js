@@ -13,6 +13,7 @@ let decodeStartAt = 0;
 let lastScanPointInfo = null;
 let scannerGuideCandidateTimer_ = null;
 let saveSuccessAnimationTimer_ = null;
+let buttonPressFeedbackInitialized_ = false;
 const SCAN_START_SUSPICIOUS_MS = 450;
 const SUSPICIOUS_CONFIRM_COUNT = 3;
 const GUIDE_ROI_X_MARGIN_RATIO = 0.12;
@@ -126,6 +127,7 @@ const STOCK_CHECK_HISTORY_LIMIT_ = 20;
 
 
 function initApp_() {
+  setupButtonPressFeedback_();
   setAppVersion();
   if (window.__APP_LOADING && window.__APP_LOADING.startMasterTimeout) {
     window.__APP_LOADING.startMasterTimeout();
@@ -139,6 +141,67 @@ if (document.readyState === "complete") {
   window.addEventListener("load", initApp_);
 }
 
+
+function setupButtonPressFeedback_() {
+  if (buttonPressFeedbackInitialized_) return;
+  buttonPressFeedbackInitialized_ = true;
+
+  const targetSelector = [
+    "button.primary",
+    "button.success",
+    "#backToResultListBtn",
+    "#topFromProductBtn",
+    "#topFromResultListBtn",
+    "#bottomFromResultListBtn",
+    "#inventoryBackToSearchListBtn",
+    "#inventoryBackToSearchInitialBtn",
+    "#inventoryBackToEntryBtn",
+    "#inventoryBackToEntryBottomBtn",
+    "#stockCheckBackToSearchInitialBtn",
+    "#stockCheckListCard > button.secondary"
+  ].join(",");
+
+  let activeButton = null;
+
+  function getTargetButton_(eventTarget) {
+    if (!eventTarget || typeof eventTarget.closest !== "function") return null;
+    return eventTarget.closest(targetSelector);
+  }
+
+  function beginPress_(event) {
+    const button = getTargetButton_(event.target);
+    if (!button) return;
+
+    if (activeButton && activeButton !== button) {
+      activeButton.classList.remove("buttonPressActive");
+    }
+
+    activeButton = button;
+    button.classList.add("buttonPressActive");
+  }
+
+  function endPress_() {
+    const button = activeButton;
+    activeButton = null;
+    if (!button) return;
+
+    setTimeout(function() {
+      button.classList.remove("buttonPressActive");
+    }, 120);
+  }
+
+  if (window.PointerEvent) {
+    document.addEventListener("pointerdown", beginPress_, true);
+    window.addEventListener("pointerup", endPress_, true);
+    window.addEventListener("pointercancel", endPress_, true);
+  } else {
+    document.addEventListener("touchstart", beginPress_, true);
+    window.addEventListener("touchend", endPress_, true);
+    window.addEventListener("touchcancel", endPress_, true);
+    document.addEventListener("mousedown", beginPress_, true);
+    window.addEventListener("mouseup", endPress_, true);
+  }
+}
 
 function showMainSection(section) {
   const nextSection = section || "menu";
@@ -168,6 +231,19 @@ function showMainSection(section) {
       const invStatusInput = document.getElementById("invStatusInput");
       if (invStatusInput) invStatusInput.value = "all";
       inventoryClearDisplayOnly_();
+    } else if (previousSection === "stockCheck") {
+      stockCheckSelectedItem_ = null;
+      stockCheckListScrollY_ = 0;
+      stockCheckReturnSource_ = "stockList";
+      clearStockCheckInputValues_();
+      hideStockCheckProductMessage_();
+      stockCheckClearSearch();
+      stockCheckHistoryClearSearch();
+      stockCheckHistoryListScrollY_ = 0;
+      stockCheckHistorySelectedItem_ = null;
+      hideStockCheckHistoryDetailMessage_();
+      hideStockCheckHistoryEditMessage_();
+      stockCheckShowModeMenu_();
     }
 
     closeCommonActionConfirm_();
@@ -616,26 +692,13 @@ function backToResultList() {
   if (backBtn) backBtn.classList.add("hidden");
   selectedItem = null;
 
-  setTimeout(function() {
-    window.scrollTo(0, resultListReturnScrollY || 0);
-  }, 0);
 }
 
 function backToSearchForm_() {
-  setTimeout(function() {
-    const searchView = document.getElementById("searchView");
-    const top = searchView ? searchView.offsetTop : 0;
-    window.scrollTo(0, Math.max(0, top || 0));
-  }, 0);
 }
 
 function backToProductSearchInitial_() {
   clearAll();
-  setTimeout(function() {
-    const searchView = document.getElementById("searchView");
-    const top = searchView ? searchView.offsetTop : 0;
-    window.scrollTo(0, Math.max(0, top || 0));
-  }, 0);
 }
 
 function goTopHome() {
@@ -651,7 +714,6 @@ function goTopHome() {
   if (completeModal) completeModal.classList.remove("show");
 
   setTimeout(function() {
-    window.scrollTo(0, 0);
     const textInput = document.getElementById("textInput");
     if (textInput) textInput.focus();
   }, 0);
@@ -1953,11 +2015,6 @@ function inventoryClearDisplayOnly_() {
 function inventoryBackToSearchInitial_() {
   inventoryClearSearch();
   inventoryClearDisplayOnly_();
-  setTimeout(function() {
-    const inventoryView = document.getElementById("inventoryView");
-    const top = inventoryView ? inventoryView.offsetTop : 0;
-    window.scrollTo(0, Math.max(0, top || 0));
-  }, 0);
 }
 
 function inventoryBackToEntry() {
@@ -1970,11 +2027,6 @@ function inventoryBackToEntry() {
 
   updateInventoryBackToMarkedListButton_();
 
-  setTimeout(function() {
-    const inventoryView = document.getElementById("inventoryView");
-    const top = inventoryView ? inventoryView.offsetTop : 0;
-    window.scrollTo(0, Math.max(0, top || 0));
-  }, 0);
 }
 
 function inventorySearch() {
@@ -2039,13 +2091,6 @@ function inventoryRunSearchPage_(append, restoreScrollY) {
       }
 
       inventoryRenderList(items, "検索結果", false, append, res);
-      if (append && Number.isFinite(restoreScrollY)) {
-        requestAnimationFrame(function() {
-          requestAnimationFrame(function() {
-            window.scrollTo(0, restoreScrollY);
-          });
-        });
-      }
       if (inventorySearchHasMore_) {
         showInventoryMessage("info", inventorySearchTotal_ + "件中 " + inventorySearchVisibleCount_ + "件を表示しています。");
       } else {
@@ -2105,9 +2150,6 @@ function inventoryBackToSearchResults() {
   updateInventoryBackToMarkedListButton_();
   hideInventoryMessage();
 
-  setTimeout(function() {
-    window.scrollTo(0, inventorySearchListReturnScrollY_ || 0);
-  }, 0);
 }
 
 function inventorySelectItem(item) {
@@ -3114,7 +3156,6 @@ function stockCheckBackToModeMenu() {
   const leavingHistory=historyIds.some(function(id){ const el=document.getElementById(id); return el && !el.classList.contains("hidden"); });
   if(leavingHistory) stockCheckHistoryClearSearch();
   stockCheckShowModeMenu_();
-  setTimeout(function(){ window.scrollTo(0,0); },0);
 }
 
 function openStockCheckInput() {
@@ -3213,11 +3254,6 @@ function stockCheckBackToSearchInitial_() {
   clearStockCheckInputValues_();
   hideStockCheckProductMessage_();
   stockCheckClearSearch();
-  setTimeout(function() {
-    const stockCheckView = document.getElementById("stockCheckView");
-    const top = stockCheckView ? stockCheckView.offsetTop : 0;
-    window.scrollTo(0, Math.max(0, top || 0));
-  }, 0);
 }
 
 function stockCheckSearch() {
@@ -3252,7 +3288,6 @@ function stockCheckRunSearchPage_(append, restoreScrollY) {
     stockCheckSearchOffset_ = Number(res.nextOffset || (stockCheckSearchOffset_ + items.length));
     stockCheckSearchHasMore_ = !!res.hasMore;
     stockCheckRenderList_(items, append);
-    if (append && Number.isFinite(restoreScrollY)) requestAnimationFrame(function(){ requestAnimationFrame(function(){ window.scrollTo(0, restoreScrollY); }); });
     showStockCheckMessage_("info", stockCheckSearchHasMore_ ? stockCheckSearchTotal_ + "件中 " + stockCheckSearchOffset_ + "件を表示しています。" : stockCheckSearchTotal_ + "件見つかりました。商品を選んでください。");
   }).catch(function(err) { endSearchLoading_(); showStockCheckMessage_("error", err && err.message ? err.message : String(err)); });
 }
@@ -3289,11 +3324,6 @@ function stockCheckBackToSearch() {
   const product = document.getElementById("stockCheckProductCard");
   if (search) search.classList.remove("hidden");
   if (product) product.classList.add("hidden");
-  setTimeout(function() {
-    const stockCheckView = document.getElementById("stockCheckView");
-    const top = stockCheckView ? stockCheckView.offsetTop : 0;
-    window.scrollTo(0, Math.max(0, top || 0));
-  }, 0);
 }
 
 function openStockCheckFromInventoryDetail() {
@@ -3323,7 +3353,6 @@ function stockCheckBackFromProduct() {
     const product=document.getElementById("stockCheckProductCard"), list=document.getElementById("stockCheckListCard");
     const search=document.getElementById("stockCheckSearchCard");
     if(product) product.classList.add("hidden"); if(search) search.classList.remove("hidden"); if(list) list.classList.remove("hidden");
-    setTimeout(function(){ window.scrollTo(0, stockCheckListScrollY_ || 0); },0);
     return;
   }
   showMainSection("inventory");
@@ -3494,7 +3523,6 @@ function stockCheckHistoryRunPage_(append, restoreScrollY) {
     stockCheckHistoryHasMore_=!!res.hasMore;
     stockCheckHistoryRenderList_(items,append);
     showStockCheckHistoryMessage_("info",stockCheckHistoryHasMore_?stockCheckHistoryTotal_+"件中 "+stockCheckHistoryOffset_+"件を表示しています。":stockCheckHistoryTotal_+"件の履歴があります。");
-    if(append&&Number.isFinite(restoreScrollY)) requestAnimationFrame(function(){requestAnimationFrame(function(){window.scrollTo(0,restoreScrollY);});});
   }).catch(function(err){ endSearchLoading_(); showStockCheckHistoryMessage_("error",err&&err.message?err.message:String(err)); });
 }
 
@@ -3532,7 +3560,6 @@ function stockCheckHistoryListHtml_(item) {
 function stockCheckHistoryBackToSearch() {
   const search=document.getElementById("stockCheckHistorySearchCard"), detail=document.getElementById("stockCheckHistoryDetailCard"), edit=document.getElementById("stockCheckHistoryEditCard");
   if(search) search.classList.remove("hidden"); if(detail) detail.classList.add("hidden"); if(edit) edit.classList.add("hidden");
-  setTimeout(function(){ const view=document.getElementById("stockCheckView"); window.scrollTo(0,Math.max(0,view?view.offsetTop:0)); },0);
 }
 
 function stockCheckHistoryOpenDetail_(item) {
@@ -3541,7 +3568,6 @@ function stockCheckHistoryOpenDetail_(item) {
   const card=document.getElementById("stockCheckHistoryDetailCard"); if(card) card.classList.remove("hidden");
   stockCheckHistoryFillDetail_();
   showStockCheckHistoryDetailMessage_("","");
-  window.scrollTo(0,0);
 }
 
 function stockCheckHistoryFillDetail_() {
@@ -3553,7 +3579,6 @@ function stockCheckHistoryFillDetail_() {
 function stockCheckHistoryBackFromDetail() {
   const detail=document.getElementById("stockCheckHistoryDetailCard"), list=document.getElementById("stockCheckHistoryListCard"), search=document.getElementById("stockCheckHistorySearchCard");
   if(detail) detail.classList.add("hidden"); if(search) search.classList.remove("hidden"); if(list) list.classList.remove("hidden");
-  setTimeout(function(){window.scrollTo(0,stockCheckHistoryListScrollY_||0);},0);
 }
 
 function stockCheckHistoryStartEdit() {
@@ -3566,7 +3591,6 @@ function stockCheckHistoryStartEdit() {
   if(s)s.value=i.systemQty; if(a)a.value=i.actualQty; if(n)n.value=i.note||"";
   showStockCheckHistoryEditMessage_("","");
   stockCheckHistoryUpdateDifference();
-  window.scrollTo(0,0);
 }
 
 function stockCheckHistoryCancelEdit() {
@@ -3642,7 +3666,6 @@ function stockCheckHistoryDelete_(pin) {
     stockCheckHistorySelectedItem_=null;
     const detail=document.getElementById("stockCheckHistoryDetailCard"),list=document.getElementById("stockCheckHistoryListCard"),search=document.getElementById("stockCheckHistorySearchCard");if(detail)detail.classList.add("hidden");if(search)search.classList.remove("hidden");if(list)list.classList.remove("hidden");
     showStockCheckHistoryMessage_("success","履歴を削除しました。\n"+(stockCheckHistoryHasMore_?stockCheckHistoryTotal_+"件中 "+stockCheckHistoryOffset_+"件を表示しています。":stockCheckHistoryTotal_+"件の履歴があります。"));
-    setTimeout(function(){window.scrollTo(0,stockCheckHistoryListScrollY_||0);},0);
   }).catch(function(err){endSearchLoading_();showStockCheckHistoryDetailMessage_("error",err&&err.message?err.message:String(err));});
 }
 
