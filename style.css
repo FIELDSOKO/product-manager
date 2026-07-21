@@ -149,15 +149,20 @@ button {
   height: 100%;
   object-fit: cover;
   background: #000;
+  opacity: 0;
+}
+
+#readerVideo.camera-video-ready {
+  opacity: 1;
 }
 
 .scannerGuide {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: min(76vw, 360px);
-  height: min(28vw, 128px);
-  min-height: 82px;
+  width: min(90vw, calc(100vw - 20px));
+  height: min(28vh, 220px);
+  min-height: 96px;
   transform: translate(-50%, -50%);
   z-index: 4;
   pointer-events: none;

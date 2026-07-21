@@ -22,6 +22,17 @@ const CAMERA_IDEAL_WIDTH_FALLBACK = 1280;
 const CAMERA_IDEAL_HEIGHT_FALLBACK = 720;
 const CAMERA_IDEAL_FPS_PRIMARY = 60;
 const CAMERA_IDEAL_FPS_FALLBACK = 30;
+const AUX_SCAN_START_DELAY_MS = 600;
+const AUX_SCAN_INTERVAL_MS = 400;
+
+let auxiliaryCodeReader = null;
+let auxiliaryScanTimer = null;
+let auxiliaryScanBusy = false;
+let auxiliaryScanLastAt = 0;
+let auxiliaryScanPatternIndex = 0;
+let auxiliaryScanStopped = true;
+let auxiliaryScanSessionId = 0;
+let auxiliaryScanCanvas = null;
 
 let currentStream = null;
 let currentVideoTrack = null;
@@ -760,12 +771,16 @@ async function toggleScanner() {
 
     scannerVideoReady = true;
     scannerReadyAt = Date.now();
+    startAuxiliaryScanner_(video);
 
     currentStream = video.srcObject || null;
     currentVideoTrack = currentStream && currentStream.getVideoTracks ?
       (currentStream.getVideoTracks()[0] || null) : null;
     setupCameraCapabilities_();
-    requestCenterFocus_();
+    await requestCenterFocus_();
+    if (scannerRunning && !scannerLocked && scannerVideoReady && isVideoRenderable_(video)) {
+      setScannerVideoVisible_(true);
+    }
 
   } catch (err) {
     await stopScanner();
@@ -959,6 +974,241 @@ function createCodeReader_(tryHarder) {
   return new ZXing.BrowserMultiFormatReader(hints, 50);
 }
 
+
+function createAuxiliaryCodeReader_() {
+  const hints = new Map();
+  hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.EAN_13]);
+  hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+  return new ZXing.BrowserMultiFormatReader(hints);
+}
+
+function stopAuxiliaryScanner_() {
+  auxiliaryScanSessionId += 1;
+  auxiliaryScanStopped = true;
+
+  if (auxiliaryScanTimer) {
+    clearTimeout(auxiliaryScanTimer);
+    auxiliaryScanTimer = null;
+  }
+
+  try {
+    if (auxiliaryCodeReader) auxiliaryCodeReader.reset();
+  } catch (e) {}
+
+  auxiliaryCodeReader = null;
+  auxiliaryScanBusy = false;
+  auxiliaryScanLastAt = 0;
+  auxiliaryScanPatternIndex = 0;
+
+  if (auxiliaryScanCanvas) {
+    auxiliaryScanCanvas.width = 1;
+    auxiliaryScanCanvas.height = 1;
+  }
+  auxiliaryScanCanvas = null;
+}
+
+function startAuxiliaryScanner_(video) {
+  stopAuxiliaryScanner_();
+
+  if (!video || !isVideoRenderable_(video) || typeof ZXing === "undefined") return;
+
+  const sessionId = auxiliaryScanSessionId;
+  auxiliaryScanStopped = false;
+  auxiliaryCodeReader = createAuxiliaryCodeReader_();
+  auxiliaryScanCanvas = document.createElement("canvas");
+
+  function scheduleNext_(delay) {
+    if (auxiliaryScanStopped || sessionId !== auxiliaryScanSessionId) return;
+    if (auxiliaryScanTimer) clearTimeout(auxiliaryScanTimer);
+    auxiliaryScanTimer = setTimeout(runAuxiliaryScan_, Math.max(0, Number(delay || 0)));
+  }
+
+  async function runAuxiliaryScan_() {
+    auxiliaryScanTimer = null;
+
+    if (
+      auxiliaryScanStopped ||
+      sessionId !== auxiliaryScanSessionId ||
+      auxiliaryScanBusy ||
+      !scannerRunning ||
+      scannerLocked ||
+      !scannerVideoReady ||
+      document.visibilityState === "hidden" ||
+      !isVideoRenderable_(video)
+    ) {
+      if (!auxiliaryScanStopped && sessionId === auxiliaryScanSessionId && scannerRunning && !scannerLocked) {
+        scheduleNext_(AUX_SCAN_INTERVAL_MS);
+      }
+      return;
+    }
+
+    const now = Date.now();
+    const elapsedFromReady = now - Number(scannerReadyAt || 0);
+    if (elapsedFromReady < AUX_SCAN_START_DELAY_MS) {
+      scheduleNext_(AUX_SCAN_START_DELAY_MS - elapsedFromReady);
+      return;
+    }
+
+    const elapsedFromLast = now - auxiliaryScanLastAt;
+    if (elapsedFromLast < AUX_SCAN_INTERVAL_MS) {
+      scheduleNext_(AUX_SCAN_INTERVAL_MS - elapsedFromLast);
+      return;
+    }
+
+    auxiliaryScanBusy = true;
+    auxiliaryScanLastAt = now;
+    const patternIndex = auxiliaryScanPatternIndex;
+    auxiliaryScanPatternIndex = (auxiliaryScanPatternIndex + 1) % 5;
+
+    try {
+      const frame = buildAuxiliaryScanFrame_(video, patternIndex);
+      if (!frame || !auxiliaryCodeReader || typeof auxiliaryCodeReader.decodeFromCanvas !== "function") return;
+
+      const result = await auxiliaryCodeReader.decodeFromCanvas(frame.canvas);
+      if (
+        result &&
+        !auxiliaryScanStopped &&
+        sessionId === auxiliaryScanSessionId &&
+        scannerRunning &&
+        !scannerLocked
+      ) {
+        scannerLocked = true;
+        await onScanSuccess(mapAuxiliaryResultToVideo_(result, frame));
+      }
+    } catch (e) {
+      // NotFoundExceptionを含む補助解析失敗は、通常解析を止めず次の低頻度候補へ進む。
+    } finally {
+      if (sessionId === auxiliaryScanSessionId) auxiliaryScanBusy = false;
+      if (!auxiliaryScanStopped && sessionId === auxiliaryScanSessionId && scannerRunning && !scannerLocked) {
+        scheduleNext_(AUX_SCAN_INTERVAL_MS);
+      }
+    }
+  }
+
+  scheduleNext_(AUX_SCAN_START_DELAY_MS);
+}
+
+function getGuideCropInVideoCoords_(video) {
+  const guide = document.querySelector(".scannerGuide");
+  if (!video || !guide || !video.videoWidth || !video.videoHeight) return null;
+
+  const videoRect = video.getBoundingClientRect();
+  const guideRect = guide.getBoundingClientRect();
+  if (!videoRect.width || !videoRect.height || !guideRect.width || !guideRect.height) return null;
+
+  const sourceWidth = Number(video.videoWidth);
+  const sourceHeight = Number(video.videoHeight);
+  const coverScale = Math.max(videoRect.width / sourceWidth, videoRect.height / sourceHeight);
+  if (!isFinite(coverScale) || coverScale <= 0) return null;
+
+  const renderedWidth = sourceWidth * coverScale;
+  const renderedHeight = sourceHeight * coverScale;
+  const hiddenX = (renderedWidth - videoRect.width) / 2;
+  const hiddenY = (renderedHeight - videoRect.height) / 2;
+
+  let sourceX = (guideRect.left - videoRect.left + hiddenX) / coverScale;
+  let sourceY = (guideRect.top - videoRect.top + hiddenY) / coverScale;
+  let sourceW = guideRect.width / coverScale;
+  let sourceH = guideRect.height / coverScale;
+
+  sourceX = Math.max(0, Math.min(sourceWidth - 1, sourceX));
+  sourceY = Math.max(0, Math.min(sourceHeight - 1, sourceY));
+  sourceW = Math.max(1, Math.min(sourceWidth - sourceX, sourceW));
+  sourceH = Math.max(1, Math.min(sourceHeight - sourceY, sourceH));
+
+  return { x: sourceX, y: sourceY, width: sourceW, height: sourceH };
+}
+
+function buildAuxiliaryScanFrame_(video, patternIndex) {
+  const crop = getGuideCropInVideoCoords_(video);
+  if (!crop || !auxiliaryScanCanvas) return null;
+
+  const shouldUpscale = crop.width < 720;
+  const scale = patternIndex === 4 && shouldUpscale ? 1.35 : 1;
+  const targetWidth = Math.max(1, Math.round(crop.width * scale));
+  const targetHeight = Math.max(1, Math.round(crop.height * scale));
+  const canvas = auxiliaryScanCanvas;
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+
+  const ctx = canvas.getContext("2d", { willReadFrequently: patternIndex > 0 && patternIndex < 4 });
+  if (!ctx) return null;
+
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(video, crop.x, crop.y, crop.width, crop.height, 0, 0, targetWidth, targetHeight);
+
+  if (patternIndex > 0 && patternIndex < 4) {
+    const imageData = ctx.getImageData(0, 0, targetWidth, targetHeight);
+    applyAuxiliaryPixelPattern_(imageData.data, patternIndex);
+    ctx.putImageData(imageData, 0, 0);
+  }
+
+  return { canvas: canvas, crop: crop, scale: scale };
+}
+
+function applyAuxiliaryPixelPattern_(data, patternIndex) {
+  for (let i = 0; i < data.length; i += 4) {
+    let r = data[i];
+    let g = data[i + 1];
+    let b = data[i + 2];
+
+    if (patternIndex === 1) {
+      r = (r - 128) * 1.22 + 128;
+      g = (g - 128) * 1.22 + 128;
+      b = (b - 128) * 1.22 + 128;
+    } else if (patternIndex === 2) {
+      r = 255 * Math.pow(r / 255, 0.88);
+      g = 255 * Math.pow(g / 255, 0.88);
+      b = 255 * Math.pow(b / 255, 0.88);
+    } else if (patternIndex === 3) {
+      const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+      const enhanced = (gray - 128) * 1.18 + 128;
+      r = enhanced;
+      g = enhanced;
+      b = enhanced;
+    }
+
+    data[i] = Math.max(0, Math.min(255, r));
+    data[i + 1] = Math.max(0, Math.min(255, g));
+    data[i + 2] = Math.max(0, Math.min(255, b));
+  }
+}
+
+function mapAuxiliaryResultToVideo_(result, frame) {
+  if (!result || !frame || !frame.crop) return result;
+
+  const crop = frame.crop;
+  const scale = Number(frame.scale || 1);
+  const mappedPoints = [];
+
+  try {
+    const points = typeof result.getResultPoints === "function" ? (result.getResultPoints() || []) : [];
+    points.forEach(function(point) {
+      const x = typeof point.getX === "function" ? Number(point.getX()) : Number(point.x);
+      const y = typeof point.getY === "function" ? Number(point.getY()) : Number(point.y);
+      if (!isFinite(x) || !isFinite(y)) return;
+
+      const mappedX = crop.x + x / scale;
+      const mappedY = crop.y + y / scale;
+      mappedPoints.push({
+        x: mappedX,
+        y: mappedY,
+        getX: function() { return mappedX; },
+        getY: function() { return mappedY; }
+      });
+    });
+  } catch (e) {}
+
+  return {
+    getText: function() {
+      return typeof result.getText === "function" ? result.getText() : String(result || "");
+    },
+    getResultPoints: function() {
+      return mappedPoints;
+    }
+  };
+}
+
 function isVideoRenderable_(video) {
   return !!(
     video &&
@@ -1043,8 +1293,15 @@ function waitForVideoReady_(video) {
   });
 }
 
+function setScannerVideoVisible_(visible) {
+  const video = document.getElementById("readerVideo");
+  if (!video) return;
+  video.classList.toggle("camera-video-ready", !!visible);
+}
+
 function openScannerView_() {
   const box = document.getElementById("scannerBox");
+  setScannerVideoVisible_(false);
   document.body.classList.add("scanner-open");
   if (box) {
     box.classList.add("show");
@@ -1054,6 +1311,7 @@ function openScannerView_() {
 
 function closeScannerView_() {
   const box = document.getElementById("scannerBox");
+  setScannerVideoVisible_(false);
   document.body.classList.remove("scanner-open");
   if (box) {
     box.classList.remove("show");
@@ -1136,6 +1394,29 @@ function updateZoomButtons_() {
   });
 }
 
+function resumeAuxiliaryScannerAfterVisibility_() {
+  const video = document.getElementById("readerVideo");
+  const stream = video && video.srcObject ? video.srcObject : currentStream;
+  const tracks = stream && stream.getVideoTracks ? stream.getVideoTracks() : [];
+  const track = tracks && tracks.length ? tracks[0] : null;
+
+  if (
+    document.visibilityState === "hidden" ||
+    !scannerRunning ||
+    scannerLocked ||
+    !scannerVideoReady ||
+    !video ||
+    !isVideoRenderable_(video) ||
+    !stream ||
+    !track ||
+    track.readyState !== "live"
+  ) {
+    return;
+  }
+
+  startAuxiliaryScanner_(video);
+}
+
 function setupScannerTouchEvents_() {
   const box = document.getElementById("scannerBox");
   if (!box || box.dataset.touchReady === "1") return;
@@ -1204,19 +1485,24 @@ function requestTapFocus_(clientX, clientY) {
 }
 
 function requestCenterFocus_() {
-  if (!currentVideoTrack || !currentVideoTrack.applyConstraints) return;
+  if (!currentVideoTrack || !currentVideoTrack.applyConstraints) return Promise.resolve();
 
   try {
-    currentVideoTrack.applyConstraints({
+    return currentVideoTrack.applyConstraints({
       advanced: [
         { focusMode: "continuous" },
         { pointsOfInterest: [{ x: 0.5, y: 0.5 }] }
       ]
     }).catch(function() {});
-  } catch (e) {}
+  } catch (e) {
+    return Promise.resolve();
+  }
 }
 
 async function stopScanner() {
+  stopAuxiliaryScanner_();
+  setScannerVideoVisible_(false);
+
   try {
     if (codeReader) codeReader.reset();
 
@@ -3363,11 +3649,15 @@ document.addEventListener("DOMContentLoaded", function() {
 
 window.addEventListener("pageshow", function() {
   resumeInventoryMapBackgroundPrepare_();
+  resumeAuxiliaryScannerAfterVisibility_();
 });
 
 document.addEventListener("visibilitychange", function() {
-  if (document.visibilityState === "visible") {
+  if (document.visibilityState === "hidden") {
+    stopAuxiliaryScanner_();
+  } else {
     resumeInventoryMapBackgroundPrepare_();
+    resumeAuxiliaryScannerAfterVisibility_();
   }
 });
 
