@@ -290,6 +290,41 @@
       font-size: 16px;
     }
 
+    /* 起動時ローディングのみ：初期描画後に既存演出を段階開始 */
+    #bootLoadingScreen:not(.boot-stage-ring) .bootLogoRingLayer {
+      visibility: hidden;
+      animation-play-state: paused;
+    }
+
+    #bootLoadingScreen.boot-stage-ring .bootLogoRingLayer {
+      visibility: visible;
+      animation-play-state: running;
+    }
+
+    #bootLoadingScreen:not(.boot-stage-glow) .bootLogoRing,
+    #bootLoadingScreen:not(.boot-stage-glow) .bootLogoRingGlow,
+    #bootLoadingScreen:not(.boot-stage-glow) .bootLogoCenter {
+      filter: none;
+    }
+
+    #bootLoadingScreen:not(.boot-stage-glow) .bootLogoRingGlow {
+      opacity: 0;
+      animation-play-state: paused;
+    }
+
+    #bootLoadingScreen.boot-stage-glow .bootLogoRingGlow {
+      animation-play-state: running;
+    }
+
+    #bootLoadingScreen:not(.boot-stage-spark) .bootLogoSpark {
+      opacity: 0;
+      animation-play-state: paused;
+    }
+
+    #bootLoadingScreen.boot-stage-spark .bootLogoSpark {
+      animation-play-state: running;
+    }
+
   </style>
   <script src="https://unpkg.com/@zxing/library@latest"></script>
   <script>
@@ -455,6 +490,59 @@
         mark("master");
       }
 
+      function startBootAnimationStages() {
+        var screen = document.getElementById("bootLoadingScreen");
+        if (!screen || screen.dataset.animationStagesStarted === "1") return;
+        screen.dataset.animationStagesStarted = "1";
+
+        var images = screen.querySelectorAll(".bootLogoWrap img");
+        var imageTasks = Array.prototype.map.call(images, function(img) {
+          if (img.complete && img.naturalWidth > 0) {
+            if (typeof img.decode === "function") {
+              return img.decode().catch(function() {});
+            }
+            return Promise.resolve();
+          }
+
+          return new Promise(function(resolve) {
+            var settled = false;
+            function finish() {
+              if (settled) return;
+              settled = true;
+              img.removeEventListener("load", finish);
+              img.removeEventListener("error", finish);
+              resolve();
+            }
+            img.addEventListener("load", finish, { once: true });
+            img.addEventListener("error", finish, { once: true });
+          });
+        });
+
+        var imageReady = Promise.all(imageTasks).catch(function() {});
+        var fallbackReady = new Promise(function(resolve) {
+          setTimeout(resolve, 180);
+        });
+
+        Promise.race([imageReady, fallbackReady]).then(function() {
+          requestAnimationFrame(function() {
+            requestAnimationFrame(function() {
+              if (!screen || !screen.isConnected || screen.classList.contains("hide")) return;
+              screen.classList.add("boot-stage-ring");
+
+              requestAnimationFrame(function() {
+                if (!screen || !screen.isConnected || screen.classList.contains("hide")) return;
+                screen.classList.add("boot-stage-glow");
+
+                requestAnimationFrame(function() {
+                  if (!screen || !screen.isConnected || screen.classList.contains("hide")) return;
+                  screen.classList.add("boot-stage-spark");
+                });
+              });
+            });
+          });
+        });
+      }
+
       function initProgressDisplay() {
         if (progressReady) return;
         progressReady = true;
@@ -483,8 +571,10 @@
 
       if (document.readyState === "loading") {
         document.addEventListener("DOMContentLoaded", initProgressDisplay);
+        document.addEventListener("DOMContentLoaded", startBootAnimationStages, { once: true });
       } else {
         initProgressDisplay();
+        startBootAnimationStages();
       }
 
       return {
