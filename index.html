@@ -796,7 +796,7 @@
     <div class="card hidden" id="productCard">
       <div class="detailNavColumn">
         <button id="backToResultListBtn" class="secondary wide hidden" onclick="backToResultList()">← 検索結果一覧へ戻る</button>
-        <button id="topFromProductBtn" class="secondary wide" onclick="backToProductSearchInitial_()">← 検索画面へ戻る</button>
+        <button id="topFromProductBtn" class="secondary wide" onclick="backToProductSearchInitial_()">🔍 検索画面へ戻る</button>
       </div>
       <div class="info">
         <div class="key">品番</div><div class="value" id="vHinban"></div>
@@ -820,11 +820,11 @@
     </div>
 
     <div class="card hidden" id="multiCard">
-      <button id="topFromResultListBtn" class="secondary wide" onclick="backToSearchForm_()">← 検索へ戻る</button>
+      <button id="topFromResultListBtn" class="secondary wide" onclick="backToProductSearchInitial_()">🔍 検索画面へ戻る</button>
       <div style="font-weight:900;">検索結果</div>
       <div class="small">複数見つかりました。変更したい商品を選んでください。</div>
       <div id="resultList"></div>
-      <button id="bottomFromResultListBtn" class="secondary wide" onclick="backToSearchForm_()">← 検索へ戻る</button>
+      <button id="bottomFromResultListBtn" class="secondary wide" onclick="backToProductSearchInitial_()">🔍 検索画面へ戻る</button>
     </div>
 
     </div>
@@ -906,7 +906,7 @@
         <div id="invStateLabel" class="inventoryStateLabel">状態：未記入</div>
         <button id="inventoryBackToSearchListBtn" class="secondary wide hidden" onclick="inventoryBackToSearchResults()">← 検索結果一覧へ戻る</button>
         <button id="inventoryBackToMarkedListBtn" class="secondary wide hidden" onclick="inventoryBackToMarkedList()">記入済商品一覧へ戻る</button>
-        <button id="inventoryBackToSearchInitialBtn" class="secondary wide" onclick="inventoryBackToSearchInitial_()">← 検索画面へ戻る</button>
+        <button id="inventoryBackToSearchInitialBtn" class="secondary wide" onclick="inventoryBackToSearchInitial_()">🔍 検索画面へ戻る</button>
         <button class="primary wide" onclick="openStockCheckFromInventoryDetail()">この商品の在庫差異確認</button>
         <div class="btn-row">
           <button class="success" onclick="inventoryMarkCurrent()">記入済</button>
@@ -916,9 +916,9 @@
 
       <div class="card hidden" id="inventoryListCard">
         <h3 id="inventoryListTitle">記入済商品一覧</h3>
-        <button id="inventoryBackToEntryBtn" class="secondary wide" onclick="inventoryBackToEntry()">← 検索へ戻る</button>
+        <button id="inventoryBackToEntryBtn" class="secondary wide" onclick="inventoryBackToSearchInitial_()">🔍 検索画面へ戻る</button>
         <div id="inventoryList"></div>
-        <button id="inventoryBackToEntryBottomBtn" class="secondary wide" onclick="inventoryBackToEntry()">← 検索へ戻る</button>
+        <button id="inventoryBackToEntryBottomBtn" class="secondary wide" onclick="inventoryBackToSearchInitial_()">🔍 検索画面へ戻る</button>
       </div>
     </div>
 
@@ -953,14 +953,14 @@
         <div id="stockCheckMessage" class="msg"></div>
       </div>
       <div id="stockCheckListCard" class="card hidden">
-        <button class="secondary wide" onclick="stockCheckBackToSearch()">← 検索へ戻る</button>
+        <button class="secondary wide" onclick="stockCheckBackToSearchInitial_()">🔍 検索画面へ戻る</button>
         <h3>検索結果</h3>
         <div id="stockCheckList"></div>
-        <button class="secondary wide" onclick="stockCheckBackToSearch()">← 検索へ戻る</button>
+        <button class="secondary wide" onclick="stockCheckBackToSearchInitial_()">🔍 検索画面へ戻る</button>
       </div>
       <div id="stockCheckProductCard" class="card hidden">
         <button class="secondary wide" onclick="stockCheckBackFromProduct()" id="stockCheckBackBtn">← 戻る</button>
-        <button class="secondary wide" onclick="stockCheckBackToSearchInitial_()" id="stockCheckBackToSearchInitialBtn">← 検索画面へ戻る</button>
+        <button class="secondary wide" onclick="stockCheckBackToSearchInitial_()" id="stockCheckBackToSearchInitialBtn">🔍 検索画面へ戻る</button>
         <div class="info">
           <div class="key">JAN</div><div class="value" id="stockJan"></div>
           <div class="key">品番</div><div class="value" id="stockHinban"></div>
