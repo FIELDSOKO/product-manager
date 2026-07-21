@@ -3610,8 +3610,8 @@ function stockCheckHistoryListHtml_(item) {
 }
 
 function stockCheckHistoryBackToSearch() {
-  const search=document.getElementById("stockCheckHistorySearchCard"), detail=document.getElementById("stockCheckHistoryDetailCard"), edit=document.getElementById("stockCheckHistoryEditCard");
-  if(search) search.classList.remove("hidden"); if(detail) detail.classList.add("hidden"); if(edit) edit.classList.add("hidden");
+  const search=document.getElementById("stockCheckHistorySearchCard"), list=document.getElementById("stockCheckHistoryListCard"), detail=document.getElementById("stockCheckHistoryDetailCard"), edit=document.getElementById("stockCheckHistoryEditCard");
+  if(search) search.classList.remove("hidden"); if(list) list.classList.add("hidden"); if(detail) detail.classList.add("hidden"); if(edit) edit.classList.add("hidden");
 }
 
 function stockCheckHistoryOpenDetail_(item) {
