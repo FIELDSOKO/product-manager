@@ -272,10 +272,6 @@ function showMainSection(section) {
 
   if (activeSection === "search") {
     scannerMode = "search";
-    setTimeout(function() {
-      const textInput = document.getElementById("textInput");
-      if (textInput) textInput.focus();
-    }, 0);
   }
 
   if (activeSection === "map") {
@@ -775,10 +771,6 @@ function goTopHome() {
   const completeModal = document.getElementById("completeModal");
   if (completeModal) completeModal.classList.remove("show");
 
-  setTimeout(function() {
-    const textInput = document.getElementById("textInput");
-    if (textInput) textInput.focus();
-  }, 0);
 }
 
 function hideProduct() {
@@ -891,8 +883,6 @@ function clearAll() {
   currentSearchPayload = null;
   currentOffset = 0;
   hideMessage();
-  const clearFocusTextInput = document.getElementById("textInput");
-  if (clearFocusTextInput && activeSection === "search") clearFocusTextInput.focus();
 }
 
 
