@@ -288,6 +288,10 @@ function showMainSection(section) {
   }
 }
 
+function backToAppHome_() {
+  showMainSection("menu");
+}
+
 function openInventoryMenu() {
   beginSearchLoading_();
   showMainSection("inventory");
@@ -3180,7 +3184,7 @@ function stockCheckBackToMenu() {
   const historyIds=["stockCheckHistorySearchCard","stockCheckHistoryListCard","stockCheckHistoryDetailCard","stockCheckHistoryEditCard"];
   const leavingHistory=historyIds.some(function(id){ const el=document.getElementById(id); return el && !el.classList.contains("hidden"); });
   if(leavingHistory) stockCheckHistoryClearSearch();
-  showMainSection("menu");
+  backToAppHome_();
 }
 
 function startStockCheckScanner() {
