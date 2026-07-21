@@ -11,11 +11,18 @@ let scannerVideoReady = false;
 let scannerReadyAt = 0;
 let decodeStartAt = 0;
 let lastScanPointInfo = null;
+let scannerGuideCandidateTimer_ = null;
+let saveSuccessAnimationTimer_ = null;
 const SCAN_START_SUSPICIOUS_MS = 450;
 const SUSPICIOUS_CONFIRM_COUNT = 3;
 const GUIDE_ROI_X_MARGIN_RATIO = 0.12;
 const GUIDE_ROI_Y_MARGIN_RATIO = 0.34;
 const GUIDE_ROI_SOFT_MARGIN_RATIO = 0.08;
+const AUX_GUIDE_WIDTH_VW_RATIO = 0.90;
+const AUX_GUIDE_WIDTH_EDGE_PX = 20;
+const AUX_GUIDE_HEIGHT_VH_RATIO = 0.28;
+const AUX_GUIDE_HEIGHT_MAX_PX = 220;
+const AUX_GUIDE_HEIGHT_MIN_PX = 96;
 const CAMERA_IDEAL_WIDTH_PRIMARY = 1920;
 const CAMERA_IDEAL_HEIGHT_PRIMARY = 1080;
 const CAMERA_IDEAL_WIDTH_FALLBACK = 1280;
@@ -407,6 +414,49 @@ function setLoading(v) {
   }
 }
 
+function setScannerGuideState_(state) {
+  const guide = document.querySelector(".scannerGuide");
+  if (!guide) return;
+
+  if (scannerGuideCandidateTimer_) {
+    clearTimeout(scannerGuideCandidateTimer_);
+    scannerGuideCandidateTimer_ = null;
+  }
+
+  guide.classList.remove("jan-candidate", "jan-success");
+
+  if (state === "candidate") {
+    guide.classList.add("jan-candidate");
+    scannerGuideCandidateTimer_ = setTimeout(function() {
+      guide.classList.remove("jan-candidate");
+      scannerGuideCandidateTimer_ = null;
+    }, 180);
+  } else if (state === "success") {
+    guide.classList.add("jan-success");
+  }
+}
+
+function showSaveSuccessAnimation_() {
+  const el = document.getElementById("saveSuccessAnimation");
+  if (!el) return;
+
+  if (saveSuccessAnimationTimer_) {
+    clearTimeout(saveSuccessAnimationTimer_);
+    saveSuccessAnimationTimer_ = null;
+  }
+
+  el.classList.remove("show");
+  void el.offsetWidth;
+  el.classList.add("show");
+  el.setAttribute("aria-hidden", "false");
+
+  saveSuccessAnimationTimer_ = setTimeout(function() {
+    el.classList.remove("show");
+    el.setAttribute("aria-hidden", "true");
+    saveSuccessAnimationTimer_ = null;
+  }, 760);
+}
+
 function showMessage(type, text) {
   const el = document.getElementById("message");
   el.className = "msg " + type;
@@ -675,6 +725,7 @@ function confirmUpdate() {
       document.getElementById("cOldLocation").textContent = res.oldLocation || "未設定";
       document.getElementById("cNewLocation").textContent = res.newLocation || "";
 
+      showSaveSuccessAnimation_();
       document.getElementById("completeModal").classList.add("show");
       loadMasterUpdatedAt();
     })
@@ -1098,12 +1149,23 @@ function startAuxiliaryScanner_(video) {
 }
 
 function getGuideCropInVideoCoords_(video) {
-  const guide = document.querySelector(".scannerGuide");
-  if (!video || !guide || !video.videoWidth || !video.videoHeight) return null;
+  if (!video || !video.videoWidth || !video.videoHeight) return null;
 
   const videoRect = video.getBoundingClientRect();
-  const guideRect = guide.getBoundingClientRect();
-  if (!videoRect.width || !videoRect.height || !guideRect.width || !guideRect.height) return null;
+  if (!videoRect.width || !videoRect.height) return null;
+
+  const viewportWidth = window.innerWidth || videoRect.width;
+  const viewportHeight = window.innerHeight || videoRect.height;
+  const guideWidth = Math.min(
+    viewportWidth * AUX_GUIDE_WIDTH_VW_RATIO,
+    Math.max(1, viewportWidth - AUX_GUIDE_WIDTH_EDGE_PX)
+  );
+  const guideHeight = Math.max(
+    AUX_GUIDE_HEIGHT_MIN_PX,
+    Math.min(viewportHeight * AUX_GUIDE_HEIGHT_VH_RATIO, AUX_GUIDE_HEIGHT_MAX_PX)
+  );
+  const guideLeft = videoRect.left + (videoRect.width - guideWidth) / 2;
+  const guideTop = videoRect.top + (videoRect.height - guideHeight) / 2;
 
   const sourceWidth = Number(video.videoWidth);
   const sourceHeight = Number(video.videoHeight);
@@ -1115,10 +1177,10 @@ function getGuideCropInVideoCoords_(video) {
   const hiddenX = (renderedWidth - videoRect.width) / 2;
   const hiddenY = (renderedHeight - videoRect.height) / 2;
 
-  let sourceX = (guideRect.left - videoRect.left + hiddenX) / coverScale;
-  let sourceY = (guideRect.top - videoRect.top + hiddenY) / coverScale;
-  let sourceW = guideRect.width / coverScale;
-  let sourceH = guideRect.height / coverScale;
+  let sourceX = (guideLeft - videoRect.left + hiddenX) / coverScale;
+  let sourceY = (guideTop - videoRect.top + hiddenY) / coverScale;
+  let sourceW = guideWidth / coverScale;
+  let sourceH = guideHeight / coverScale;
 
   sourceX = Math.max(0, Math.min(sourceWidth - 1, sourceX));
   sourceY = Math.max(0, Math.min(sourceHeight - 1, sourceY));
@@ -1310,6 +1372,7 @@ function setScannerVideoVisible_(visible) {
 
 function openScannerView_() {
   const box = document.getElementById("scannerBox");
+  setScannerGuideState_("");
   setScannerVideoVisible_(false);
   document.body.classList.add("scanner-open");
   if (box) {
@@ -1320,6 +1383,7 @@ function openScannerView_() {
 
 function closeScannerView_() {
   const box = document.getElementById("scannerBox");
+  setScannerGuideState_("");
   setScannerVideoVisible_(false);
   document.body.classList.remove("scanner-open");
   if (box) {
@@ -1773,6 +1837,7 @@ async function onScanSuccess(scanResult) {
     return;
   }
 
+  setScannerGuideState_("candidate");
 
   const suspicious = isSuspiciousScan_(jan, pointInfo, stablePoints, guidePriority);
 
@@ -1788,6 +1853,7 @@ async function onScanSuccess(scanResult) {
   const requiredCount = suspicious ? SUSPICIOUS_CONFIRM_COUNT : 2;
 
   if (sameScanCount >= requiredCount) {
+    setScannerGuideState_("success");
     await confirmScanJan_(jan);
     return;
   }
@@ -2187,6 +2253,7 @@ function inventorySetCurrentStatus_(status) {
     }
 
     inventorySelectItem(selectedInventoryItem);
+    showSaveSuccessAnimation_();
 
     if (status !== "記入済" && currentInventoryMarkedListActive) {
       inventoryReloadMarkedList_();
@@ -3353,6 +3420,7 @@ function saveStockCheck_(n, increase, decrease) {
     stockCheckHistorySelectedItem_=null;
     const historyList=document.getElementById("stockCheckHistoryList"); if(historyList) historyList.innerHTML="";
     ["stockCheckHistoryListCard","stockCheckHistoryDetailCard","stockCheckHistoryEditCard"].forEach(function(id){ const el=document.getElementById(id); if(el) el.classList.add("hidden"); });
+    showSaveSuccessAnimation_();
     showStockCheckProductMessage_("success","在庫差異確認を保存しました。");
   }).catch(function(err){ endSearchLoading_(); showStockCheckProductMessage_("error",err && err.message ? err.message : String(err)); });
 }

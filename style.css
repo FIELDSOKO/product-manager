@@ -879,3 +879,129 @@ body.map-active .mapOuter {
   min-width: 0;
   max-width: 100%;
 }
+
+/* 今回追加：カメラ中央ガイドのネオン表示 */
+.scannerGuide {
+  width: min(94vw, calc(100vw - 12px));
+  height: min(31vh, 245px);
+  min-height: 104px;
+  opacity: 1;
+}
+
+.scannerGuide span {
+  width: 42px;
+  height: 30px;
+  border-color: #00a8ff;
+  filter: drop-shadow(0 0 4px rgba(0, 168, 255, 1)) drop-shadow(0 0 10px rgba(0, 120, 255, 0.9));
+  transition: border-color 0.12s ease, filter 0.12s ease;
+}
+
+.scannerGuide span:nth-child(1) {
+  border-left-color: #00a8ff;
+  border-top-color: #00a8ff;
+}
+.scannerGuide span:nth-child(2) {
+  border-right-color: #00a8ff;
+  border-top-color: #00a8ff;
+}
+.scannerGuide span:nth-child(3) {
+  border-left-color: #00a8ff;
+  border-bottom-color: #00a8ff;
+}
+.scannerGuide span:nth-child(4) {
+  border-right-color: #00a8ff;
+  border-bottom-color: #00a8ff;
+}
+
+.scannerGuide.jan-candidate span {
+  border-color: #ffe600;
+  filter: drop-shadow(0 0 4px rgba(255, 230, 0, 1)) drop-shadow(0 0 11px rgba(255, 196, 0, 0.95));
+}
+
+.scannerGuide.jan-success span {
+  border-color: #20f070;
+  filter: drop-shadow(0 0 5px rgba(32, 240, 112, 1)) drop-shadow(0 0 13px rgba(0, 220, 90, 0.95));
+}
+
+/* 今回追加：保存成功時のみ表示するチェック演出 */
+.saveSuccessAnimation {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483646;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+}
+
+.saveSuccessAnimation.show {
+  visibility: visible;
+  animation: saveSuccessFade 0.72s ease-out forwards;
+}
+
+.saveSuccessCheck {
+  width: 66px;
+  height: 66px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(22, 163, 74, 0.96);
+  color: #ffffff;
+  font-size: 42px;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: 0 0 18px rgba(34, 197, 94, 0.82), 0 0 36px rgba(34, 197, 94, 0.44);
+  transform: scale(0.72);
+}
+
+.saveSuccessAnimation.show .saveSuccessCheck {
+  animation: saveSuccessCheckPop 0.72s ease-out forwards;
+}
+
+@keyframes saveSuccessCheckPop {
+  0% { transform: scale(0.72); }
+  22% { transform: scale(1.08); }
+  36%, 72% { transform: scale(1); }
+  100% { transform: scale(0.98); }
+}
+
+@keyframes saveSuccessFade {
+  0% { opacity: 0; }
+  12%, 72% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* 今回追加：主要ボタンの押下フィードバック */
+button.primary,
+button.success,
+#backToResultListBtn,
+#topFromProductBtn,
+#topFromResultListBtn,
+#bottomFromResultListBtn,
+#inventoryBackToSearchListBtn,
+#inventoryBackToSearchInitialBtn,
+#inventoryBackToEntryBtn,
+#inventoryBackToEntryBottomBtn,
+#stockCheckBackToSearchInitialBtn,
+#stockCheckListCard > button.secondary {
+  transition: transform 0.11s ease;
+  transform-origin: center;
+}
+
+button.primary:active,
+button.success:active,
+#backToResultListBtn:active,
+#topFromProductBtn:active,
+#topFromResultListBtn:active,
+#bottomFromResultListBtn:active,
+#inventoryBackToSearchListBtn:active,
+#inventoryBackToSearchInitialBtn:active,
+#inventoryBackToEntryBtn:active,
+#inventoryBackToEntryBottomBtn:active,
+#stockCheckBackToSearchInitialBtn:active,
+#stockCheckListCard > button.secondary:active {
+  transform: scale(0.96);
+}
