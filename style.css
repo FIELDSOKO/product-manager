@@ -407,6 +407,16 @@ body.common-action-confirm-open {
   width: 100%;
 }
 
+.detailNavColumn {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.detailNavColumn .wide {
+  width: 100%;
+}
+
 @media (max-width: 420px) {
   body { padding: 10px; }
   .grid { grid-template-columns: 1fr; gap: 0; }

@@ -579,6 +579,15 @@ function backToSearchForm_() {
   }, 0);
 }
 
+function backToProductSearchInitial_() {
+  clearAll();
+  setTimeout(function() {
+    const searchView = document.getElementById("searchView");
+    const top = searchView ? searchView.offsetTop : 0;
+    window.scrollTo(0, Math.max(0, top || 0));
+  }, 0);
+}
+
 function goTopHome() {
   // 商品検索・ロケ変更ページ内のトップへ戻る。
   // メインメニューへ戻る処理は showMainSection("menu") のボタンだけで行う。
@@ -1875,6 +1884,16 @@ function inventoryClearDisplayOnly_() {
   hideInventoryMessage();
 }
 
+function inventoryBackToSearchInitial_() {
+  inventoryClearSearch();
+  inventoryClearDisplayOnly_();
+  setTimeout(function() {
+    const inventoryView = document.getElementById("inventoryView");
+    const top = inventoryView ? inventoryView.offsetTop : 0;
+    window.scrollTo(0, Math.max(0, top || 0));
+  }, 0);
+}
+
 function inventoryBackToEntry() {
   selectedInventoryItem = null;
 
@@ -3118,6 +3137,20 @@ function stockCheckClearSearch() {
   const list = document.getElementById("stockCheckList"); if (list) list.innerHTML = "";
   stockCheckShowSearch_();
   hideStockCheckMessage_();
+}
+
+function stockCheckBackToSearchInitial_() {
+  stockCheckSelectedItem_ = null;
+  stockCheckListScrollY_ = 0;
+  stockCheckReturnSource_ = "stockList";
+  clearStockCheckInputValues_();
+  hideStockCheckProductMessage_();
+  stockCheckClearSearch();
+  setTimeout(function() {
+    const stockCheckView = document.getElementById("stockCheckView");
+    const top = stockCheckView ? stockCheckView.offsetTop : 0;
+    window.scrollTo(0, Math.max(0, top || 0));
+  }, 0);
 }
 
 function stockCheckSearch() {
