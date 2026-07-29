@@ -1,5 +1,5 @@
 const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzN6ULmcDYUWLTmft67k_Wrra1WazV_aHroJPE63kQnFyLo9LW4_8Rb43qo9hxyTn9krw/exec";
-const APP_VERSION = window.__APP_VERSION || "2026.07.02.13";
+const APP_VERSION = window.__APP_VERSION || "2026.07.29.230325";
 
 let selectedItem = null;
 let codeReader = null;
