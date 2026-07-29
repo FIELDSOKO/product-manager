@@ -1,4 +1,4 @@
-name: Update version.json
+name: Update version.json and fallback version
 
 on:
   push:
@@ -26,44 +26,49 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Update version.json
+      - name: Update version.json and fallback version
         run: |
           VERSION=$(TZ='Asia/Tokyo' date '+%Y.%m.%d.%H%M%S')
           printf '{\n  "version": "%s"\n}\n' "$VERSION" > version.json
+
+          python3 - "$VERSION" <<'PY'
+          import re
+          import sys
+          from pathlib import Path
+
+          version = sys.argv[1]
+          script_path = Path("script.js")
+          script = script_path.read_text(encoding="utf-8")
+          pattern = r'(const APP_VERSION = window\.__APP_VERSION \|\| ")[^"]*(";)'
+          updated, count = re.subn(pattern, rf'\g<1>{version}\g<2>', script, count=1)
+          if count != 1:
+              raise SystemExit("APP_VERSION fallback was not found exactly once in script.js")
+          script_path.write_text(updated, encoding="utf-8")
+          PY
+
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
-      - name: Commit and Push with Auto Retry
-        shell: bash
+      - name: Commit and push with retry
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          if git diff --quiet -- version.json; then
-            echo "version.json has no changes."
+          if git diff --quiet -- version.json script.js; then
+            echo "version.json and script.js have no changes."
             exit 0
           fi
 
-          git add version.json
-          git commit -m "chore: update version.json ${VERSION} [skip actions]"
+          git add version.json script.js
+          git commit -m "chore: update version and fallback ${VERSION} [skip actions]"
 
-          for i in 1 2 3 4 5; do
-            echo "========== Retry ${i} =========="
-
+          for i in 1 2 3; do
             git fetch origin main
-
-            if ! git pull --rebase origin main; then
-              echo "Rebase failed. Aborting..."
-              git rebase --abort || true
-            fi
-
+            git pull --rebase origin main || true
             if git push origin HEAD:main; then
-              echo "Push succeeded."
               exit 0
             fi
-
-            echo "Push failed. Waiting before retry..."
-            sleep 3
+            sleep 2
           done
 
-          echo "ERROR: Push failed after 5 retries."
+          echo "Push failed after retries."
           exit 1
