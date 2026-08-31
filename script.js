@@ -1,5 +1,5 @@
 const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzN6ULmcDYUWLTmft67k_Wrra1WazV_aHroJPE63kQnFyLo9LW4_8Rb43qo9hxyTn9krw/exec";
-const APP_VERSION = window.__APP_VERSION || "2026.07.29.230325";
+const APP_VERSION = window.__APP_VERSION || "2026.07.02.13";
 
 let selectedItem = null;
 let codeReader = null;
@@ -3445,7 +3445,7 @@ function updateStockCheckDifference() {
 }
 
 function clearStockCheckInputValues_() {
-  ["stockSystemQty","stockActualQty"].forEach(function(id){ const el=document.getElementById(id); if(el) el.value=""; });
+  ["stockWarehouseName","stockSystemQty","stockActualQty"].forEach(function(id){ const el=document.getElementById(id); if(el) el.value=""; });
   updateStockCheckDifference();
 }
 
@@ -3470,13 +3470,15 @@ function confirmStockCheckClearInputs() {
 
 function confirmStockCheckSave() {
   if(!stockCheckSelectedItem_) return;
+  const warehouseName=String((document.getElementById("stockWarehouseName") || {}).value || "").trim();
+  if(!warehouseName){ showStockCheckProductMessage_("error","倉庫名称を選択してください。"); return; }
   const n=getStockCheckNumbers_();
   if(!n.hasBoth){ showStockCheckProductMessage_("error","システム在庫と実在庫を入力してください。"); return; }
   if(!n.integer){ showStockCheckProductMessage_("error","システム在庫・実在庫は整数で入力してください。"); return; }
   if(!n.actualNonNegative){ showStockCheckProductMessage_("error","実在庫は0以上で入力してください。"); return; }
   hideStockCheckProductMessage_();
   const increase=n.difference>0?n.difference:"", decrease=n.difference<0?Math.abs(n.difference):"";
-  let message="この内容で保存しますか？\n\nシステム在庫："+n.system+"\n実在庫："+n.actual+"\n";
+  let message="この内容で保存しますか？\n\n倉庫名称："+warehouseName+"\nシステム在庫："+n.system+"\n実在庫："+n.actual+"\n";
   if(n.difference===0){
     message+="差異なし";
   } else if(n.difference>0){
@@ -3484,13 +3486,13 @@ function confirmStockCheckSave() {
   } else {
     message+="差異："+n.difference+"\n減らす数："+decrease;
   }
-  openCommonActionConfirm_(message, function(){ saveStockCheck_(n, increase, decrease); });
+  openCommonActionConfirm_(message, function(){ saveStockCheck_(n, increase, decrease, warehouseName); });
 }
 
-function saveStockCheck_(n, increase, decrease) {
+function saveStockCheck_(n, increase, decrease, warehouseName) {
   const item=stockCheckSelectedItem_;
   beginSearchLoading_();
-  callGas("saveStockCheck", { rowNo:item.rowNo||"", jan:item.jan||"", hinban:item.hinban||"", name:item.name||"", color:item.color||"", size:item.size||"", location:item.location||"", systemQty:n.system, actualQty:n.actual, increaseQty:increase, decreaseQty:decrease, difference:n.difference }).then(function(res){
+  callGas("saveStockCheck", { rowNo:item.rowNo||"", jan:item.jan||"", hinban:item.hinban||"", name:item.name||"", color:item.color||"", size:item.size||"", location:item.location||"", warehouseName:warehouseName, systemQty:n.system, actualQty:n.actual, increaseQty:increase, decreaseQty:decrease, difference:n.difference }).then(function(res){
     endSearchLoading_();
     if(!res || !res.ok){ showStockCheckProductMessage_("error",res && res.message ? res.message : "保存に失敗しました。"); return; }
     stockCheckHistorySearchPayload_=null;

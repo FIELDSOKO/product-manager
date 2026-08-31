@@ -969,6 +969,14 @@
           <div class="key">サイズ</div><div class="value" id="stockSize"></div>
           <div class="key">ロケ</div><div class="value" id="stockLocation"></div>
         </div>
+        <div class="field" style="margin-top:14px;">
+          <label>倉庫名称</label>
+          <select id="stockWarehouseName">
+            <option value="">選択してください</option>
+            <option value="可部倉庫">可部倉庫</option>
+            <option value="ネット倉庫">ネット倉庫</option>
+          </select>
+        </div>
         <div class="field" style="margin-top:14px;"><label>システム在庫</label><input id="stockSystemQty" inputmode="numeric" type="number" step="1" oninput="updateStockCheckDifference()"></div>
         <div class="field"><label>実在庫</label><input id="stockActualQty" inputmode="numeric" type="number" step="1" oninput="updateStockCheckDifference()"></div>
         <div id="stockDifferenceBox" class="stockDifferenceBox">差異：未計算</div>
